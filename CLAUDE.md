@@ -20,6 +20,11 @@ Besides the files the skills produce, the course requires these docs (in Portugu
 | Cart security | `/security-review` | `docs/carrinho/security-report-carrinho.md` |
 | Reverse engineering | `/to-spec` (fresh session) | `docs/carrinho/reverse-frd-carrinho.md`, `docs/carrinho/compare-frd-carrinho.md` |
 
+## Before writing code
+
+- Dependency versions are pinned in `docs/adr/0008-pinned-dependency-versions.md`; install exactly those, not the latest.
+- Layering, error and contract rules: `CODING_STANDARDS.md`.
+
 ## Agent skills
 
 ### Issue tracker
