@@ -1,0 +1,18 @@
+{
+  "name": "aigile-ecommerce",
+  "private": true,
+  "type": "module",
+  "workspaces": ["shared", "backend", "frontend"],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "check": "npm run typecheck --workspaces && biome check .",
+    "format": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@types/node": "^24",
+    "typescript": "~5.8"
+  }
+}
