@@ -54,4 +54,16 @@ export function registerCartRoutes(app: App, service: CartsService): void {
     { schema: { params: CartParams, response: { 200: Cart } } },
     async ({ params }) => service.removeCoupon(params.id),
   );
+
+  app.post(
+    "/api/carts/:id/checkout",
+    { schema: { params: CartParams, response: { 200: Cart } } },
+    async ({ params }) => service.checkout(params.id),
+  );
+
+  app.post(
+    "/api/carts/:id/edit",
+    { schema: { params: CartParams, response: { 200: Cart } } },
+    async ({ params }) => service.edit(params.id),
+  );
 }

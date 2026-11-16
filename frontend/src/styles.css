@@ -98,6 +98,12 @@ product-card.sold-out {
   font-weight: bold;
 }
 
+.cart-transitions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
 .catalog-error,
 .cart-error,
 .add-to-cart-error {

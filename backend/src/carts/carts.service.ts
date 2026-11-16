@@ -8,6 +8,7 @@ import {
 import type { Clock } from "../clock.ts";
 import { DomainError } from "../domain-error.ts";
 import type { ProductsRepository } from "../products/products.repository.ts";
+import { type CartAction, invalidTransition, nextStatus } from "./cart-transitions.ts";
 import type { CartChange, CartRecord, CartsRepository, CouponRecord } from "./carts.repository.ts";
 
 export type CartsService = {
@@ -18,6 +19,10 @@ export type CartsService = {
   removeItem: (cartId: string, productId: string) => Promise<Cart>;
   applyCoupon: (cartId: string, code: string) => Promise<Cart>;
   removeCoupon: (cartId: string) => Promise<Cart>;
+  /** Locks the items for review: with_items → checkout. */
+  checkout: (cartId: string) => Promise<Cart>;
+  /** Unlocks the items: checkout → with_items. */
+  edit: (cartId: string) => Promise<Cart>;
 };
 
 export type CartsServiceDependencies = {
@@ -41,6 +46,7 @@ export function createCartsService({
 
     addItem: async (cartId, { productId, quantity }) => {
       const cart = await findCart(carts, cartId);
+      const status = nextStatus(cart.status, "addItem");
       const product = await products.findById(productId);
       if (product === null) {
         throw new DomainError("PRODUCT_NOT_FOUND", "Produto não encontrado.");
@@ -54,15 +60,17 @@ export function createCartsService({
         );
       }
       assertInStock(product, resultingQuantity);
-      await carts.addItem(
+      const written = await carts.addItem(
         { cartId, productId, quantity, unitPriceCents: product.priceCents },
-        { status: "with_items", changedAt: clock.now() },
+        { from: cart.status, status, changedAt: clock.now() },
       );
+      await assertWritten(written, cartId);
       return toCart(await findCart(carts, cartId));
     },
 
     updateItemQuantity: async (cartId, productId, quantity) => {
       const cart = await findCart(carts, cartId);
+      const status = nextStatus(cart.status, "updateItemQuantity");
       assertInCart(cart, productId);
       const product = await products.findById(productId);
       if (product === null) {
@@ -70,30 +78,33 @@ export function createCartsService({
         throw new Error(`Product ${productId} of a Cart Item does not exist`);
       }
       assertInStock(product, quantity);
-      await carts.updateItemQuantity({ cartId, productId }, quantity, {
-        status: "with_items",
+      const written = await carts.updateItemQuantity({ cartId, productId }, quantity, {
+        from: cart.status,
+        status,
         changedAt: clock.now(),
       });
+      await assertWritten(written, cartId);
       return toCart(await findCart(carts, cartId));
     },
 
     removeItem: async (cartId, productId) => {
       const cart = await findCart(carts, cartId);
+      const removesLastItem = cart.items.length === 1 && cart.items[0]?.productId === productId;
+      const action: CartAction = removesLastItem ? "removeLastItem" : "removeItem";
+      const status = nextStatus(cart.status, action);
       assertInCart(cart, productId);
-      const removesLastItem = cart.items.length === 1;
-      // An empty Cart never carries a Coupon (FRD, "Cart Items").
-      const change: CartChange = removesLastItem
-        ? { status: "empty", changedAt: clock.now(), couponId: null }
-        : { status: "with_items", changedAt: clock.now() };
-      await carts.removeItem({ cartId, productId }, change);
+      const change: CartChange = { from: cart.status, status, changedAt: clock.now() };
+      if (removesLastItem) {
+        // An empty Cart never carries a Coupon (FRD, "Cart Items").
+        change.couponId = null;
+      }
+      await assertWritten(await carts.removeItem({ cartId, productId }, change), cartId);
       return toCart(await findCart(carts, cartId));
     },
 
     applyCoupon: async (cartId, code) => {
       const cart = await findCart(carts, cartId);
-      if (cart.status === "empty") {
-        throw new DomainError("CART_EMPTY", "Não é possível aplicar um cupom a um carrinho vazio.");
-      }
+      const status = nextStatus(cart.status, "applyCoupon");
       const coupon = await carts.findCouponByCode(code.toUpperCase());
       if (coupon === null) {
         throw new DomainError("COUPON_NOT_FOUND", "Cupom não encontrado.");
@@ -102,20 +113,47 @@ export function createCartsService({
       if (now >= coupon.expiresAt) {
         throw new DomainError("COUPON_EXPIRED", "Este cupom expirou.");
       }
-      await carts.setCoupon(cartId, coupon.id, now);
+      const change = { from: cart.status, status, changedAt: now };
+      await assertWritten(await carts.setCoupon(cartId, coupon.id, change), cartId);
       return toCart(await findCart(carts, cartId));
     },
 
     removeCoupon: async (cartId) => {
       const cart = await findCart(carts, cartId);
+      const status = nextStatus(cart.status, "removeCoupon");
       // Removing when there is no Coupon has no effect, not even on the last change.
       if (cart.coupon === null) {
         return toCart(cart);
       }
-      await carts.setCoupon(cartId, null, clock.now());
+      const change = { from: cart.status, status, changedAt: clock.now() };
+      await assertWritten(await carts.setCoupon(cartId, null, change), cartId);
       return toCart(await findCart(carts, cartId));
     },
+
+    checkout: (cartId) => transition(cartId, "checkout"),
+
+    edit: (cartId) => transition(cartId, "edit"),
   };
+
+  /** Moves the Cart along the table for an action that touches nothing but its status. */
+  async function transition(cartId: string, action: CartAction): Promise<Cart> {
+    const cart = await findCart(carts, cartId);
+    const status = nextStatus(cart.status, action);
+    const change = { from: cart.status, status, changedAt: clock.now() };
+    await assertWritten(await carts.recordChange(cartId, change), cartId);
+    return toCart(await findCart(carts, cartId));
+  }
+
+  /**
+   * A write that found the Cart no longer in the status it was checked against lost a race
+   * with another request (say, adding an item while the checkout starts): it is refused as a
+   * transition from the status the Cart is in now.
+   */
+  async function assertWritten(written: boolean, cartId: string): Promise<void> {
+    if (!written) {
+      throw invalidTransition((await findCart(carts, cartId)).status);
+    }
+  }
 }
 
 async function findCart(carts: CartsRepository, id: string): Promise<CartRecord> {

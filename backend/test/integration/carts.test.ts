@@ -422,7 +422,7 @@ describe("Carts API", () => {
     });
 
     it("responds 404 CART_ITEM_NOT_FOUND for a Product that is not in the Cart", async () => {
-      const cartId = await createCart();
+      const cartId = await cartWithItems();
       const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
 
       const response = await updateItem(cartId, mugId, { quantity: 1 });
@@ -493,7 +493,7 @@ describe("Carts API", () => {
     });
 
     it("responds 404 CART_ITEM_NOT_FOUND for a Product that is not in the Cart", async () => {
-      const cartId = await createCart();
+      const cartId = await cartWithItems();
       const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
 
       const response = await removeItem(cartId, mugId);
@@ -712,6 +712,247 @@ describe("Carts API", () => {
     });
   });
 
+  describe("POST /api/carts/:id/checkout", () => {
+    it("moves a Cart with_items to checkout, keeping its items and money", async () => {
+      const cartId = await cartWithItems();
+
+      const response = await checkout(cartId);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        id: cartId,
+        status: "checkout",
+        items: [
+          {
+            productId: expect.stringMatching(UUID),
+            name: "Vaso de Barro",
+            unitPriceCents: 5000,
+            quantity: 2,
+            lineTotalCents: 10000,
+          },
+        ],
+        coupon: null,
+        subtotalCents: 10000,
+        discountCents: 0,
+        totalCents: 10000,
+      });
+    });
+
+    it("responds 409 CART_EMPTY for an empty Cart", async () => {
+      const cartId = await createCart();
+
+      const response = await checkout(cartId);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        error: { code: "CART_EMPTY", message: expect.any(String) },
+      });
+    });
+
+    it("responds 409 INVALID_CART_TRANSITION for a Cart already in checkout", async () => {
+      const { cartId } = await cartInCheckout();
+
+      const response = await checkout(cartId);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        error: {
+          code: "INVALID_CART_TRANSITION",
+          message: expect.any(String),
+          details: { status: "checkout" },
+        },
+      });
+    });
+
+    it("responds 404 CART_NOT_FOUND for a Cart that does not exist", async () => {
+      const response = await checkout(UNKNOWN_CART_ID);
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({ error: { code: "CART_NOT_FOUND" } });
+    });
+  });
+
+  describe("POST /api/carts/:id/edit", () => {
+    it("moves a Cart in checkout back to with_items, so its items can change again", async () => {
+      const { cartId, vaseId } = await cartInCheckout();
+
+      const response = await edit(cartId);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        id: cartId,
+        status: "with_items",
+        items: [
+          {
+            productId: vaseId,
+            name: "Vaso de Barro",
+            unitPriceCents: 5000,
+            quantity: 2,
+            lineTotalCents: 10000,
+          },
+        ],
+        coupon: null,
+        subtotalCents: 10000,
+        discountCents: 0,
+        totalCents: 10000,
+      });
+      const updated = await updateItem(cartId, vaseId, { quantity: 3 });
+      expect(updated.statusCode).toBe(200);
+      expect(updated.json()).toMatchObject({ status: "with_items", subtotalCents: 15000 });
+    });
+
+    it("responds 409 INVALID_CART_TRANSITION for a Cart with_items", async () => {
+      const cartId = await cartWithItems();
+
+      const response = await edit(cartId);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        error: {
+          code: "INVALID_CART_TRANSITION",
+          message: expect.any(String),
+          details: { status: "with_items" },
+        },
+      });
+    });
+
+    it("responds 409 INVALID_CART_TRANSITION for an empty Cart", async () => {
+      const cartId = await createCart();
+
+      const response = await edit(cartId);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        error: { code: "INVALID_CART_TRANSITION", details: { status: "empty" } },
+      });
+    });
+
+    it("responds 404 CART_NOT_FOUND for a Cart that does not exist", async () => {
+      const response = await edit(UNKNOWN_CART_ID);
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({ error: { code: "CART_NOT_FOUND" } });
+    });
+  });
+
+  describe("Cart in checkout", () => {
+    const refusedInCheckout = {
+      error: {
+        code: "INVALID_CART_TRANSITION",
+        message: expect.any(String),
+        details: { status: "checkout" },
+      },
+    };
+
+    it("refuses adding, changing and removing items with 409 INVALID_CART_TRANSITION, leaving the items as they were", async () => {
+      const { cartId, vaseId } = await cartInCheckout();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+
+      const added = await addItem(cartId, { productId: mugId, quantity: 1 });
+      const sameAdded = await addItem(cartId, { productId: vaseId, quantity: 1 });
+      const updated = await updateItem(cartId, vaseId, { quantity: 1 });
+      const removed = await removeItem(cartId, vaseId);
+
+      for (const response of [added, sameAdded, updated, removed]) {
+        expect(response.statusCode).toBe(409);
+        expect(response.json()).toEqual(refusedInCheckout);
+      }
+      const cart = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+      expect(cart.json()).toMatchObject({
+        status: "checkout",
+        items: [{ productId: vaseId, quantity: 2 }],
+        subtotalCents: 10000,
+      });
+    });
+
+    it("still applies and removes a Coupon, staying in checkout", async () => {
+      const { cartId } = await cartInCheckout();
+      await insertCoupon({ code: "DEZ", type: "percentage", value: 10 });
+
+      const applied = await applyCoupon(cartId, { code: "DEZ" });
+      expect(applied.statusCode).toBe(200);
+      expect(applied.json()).toMatchObject({
+        status: "checkout",
+        coupon: { code: "DEZ", type: "percentage", value: 10 },
+        discountCents: 1000,
+        totalCents: 9000,
+      });
+
+      const removed = await removeCoupon(cartId);
+      expect(removed.statusCode).toBe(200);
+      expect(removed.json()).toMatchObject({
+        status: "checkout",
+        coupon: null,
+        discountCents: 0,
+        totalCents: 10000,
+      });
+    });
+
+    it("never lets an item added at the same time as the checkout slip into it", async () => {
+      const cartId = await cartWithItems();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+
+      const [entered, added] = await Promise.all([
+        checkout(cartId),
+        addItem(cartId, { productId: mugId, quantity: 1 }),
+      ]);
+
+      expect(entered.statusCode).toBe(200);
+      const cart = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+      expect(cart.json()).toMatchObject({ status: "checkout" });
+      // Either the item went in before the checkout started, and the checkout shows it, or it
+      // was refused because the Cart was already in checkout.
+      if (added.statusCode === 200) {
+        expect(entered.json().items).toHaveLength(2);
+      } else {
+        expect(added.json()).toEqual(refusedInCheckout);
+        expect(cart.json().items).toHaveLength(1);
+      }
+    });
+
+    it("keeps the Coupon applied before checkout, through checkout and back to editing", async () => {
+      const cartId = await cartWithItems();
+      await insertCoupon({ code: "MENOS25", type: "fixed", value: 2500 });
+      await applyCoupon(cartId, { code: "MENOS25" });
+
+      const inCheckout = await checkout(cartId);
+      expect(inCheckout.json()).toMatchObject({
+        status: "checkout",
+        coupon: { code: "MENOS25", type: "fixed", value: 2500 },
+        totalCents: 7500,
+      });
+
+      const editing = await edit(cartId);
+      expect(editing.json()).toMatchObject({
+        status: "with_items",
+        coupon: { code: "MENOS25", type: "fixed", value: 2500 },
+        totalCents: 7500,
+      });
+    });
+  });
+
+  describe("actions outside the transition table on an empty Cart", () => {
+    it("refuses changing or removing an item and removing a Coupon with 409 INVALID_CART_TRANSITION", async () => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+
+      const updated = await updateItem(cartId, mugId, { quantity: 1 });
+      const removed = await removeItem(cartId, mugId);
+      const couponRemoved = await removeCoupon(cartId);
+
+      for (const response of [updated, removed, couponRemoved]) {
+        expect(response.statusCode).toBe(409);
+        expect(response.json()).toEqual({
+          error: {
+            code: "INVALID_CART_TRANSITION",
+            message: expect.any(String),
+            details: { status: "empty" },
+          },
+        });
+      }
+    });
+  });
+
   describe("Discount after item changes", () => {
     it("is recalculated when a quantity changes and when an item is removed", async () => {
       const cartId = await createCart();
@@ -834,6 +1075,28 @@ describe("Carts API", () => {
       expect(await lastChangedAt(cartId)).toEqual(before);
     });
 
+    it("is set when the Cart enters checkout and when it goes back to editing", async () => {
+      const cartId = await cartWithItems();
+
+      clock.set(new Date("2026-11-16T14:00:00Z"));
+      await checkout(cartId);
+      expect(await lastChangedAt(cartId)).toEqual(new Date("2026-11-16T14:00:00Z"));
+
+      clock.set(new Date("2026-11-16T15:00:00Z"));
+      await edit(cartId);
+      expect(await lastChangedAt(cartId)).toEqual(new Date("2026-11-16T15:00:00Z"));
+    });
+
+    it("is not changed by a refused transition", async () => {
+      const cartId = await cartWithItems();
+      const before = await lastChangedAt(cartId);
+
+      clock.set(new Date("2026-11-16T14:00:00Z"));
+      await edit(cartId);
+
+      expect(await lastChangedAt(cartId)).toEqual(before);
+    });
+
     it("is not changed by a rejected addition", async () => {
       clock.set(new Date("2026-11-16T08:00:00Z"));
       const cartId = await createCart();
@@ -863,6 +1126,26 @@ describe("Carts API", () => {
     const vaseId = await insertProduct({ name: "Vaso de Barro", priceCents: 5000, stock: 10 });
     await addItem(cartId, { productId: vaseId, quantity: 2 });
     return cartId;
+  }
+
+  /** A Cart in checkout holding two Vasos de Barro (Subtotal R$ 100,00). */
+  async function cartInCheckout(): Promise<{ cartId: string; vaseId: string }> {
+    const cartId = await createCart();
+    const vaseId = await insertProduct({ name: "Vaso de Barro", priceCents: 5000, stock: 10 });
+    await addItem(cartId, { productId: vaseId, quantity: 2 });
+    const response = await checkout(cartId);
+    if (response.statusCode !== 200) {
+      throw new Error(`checkout responded ${response.statusCode}`);
+    }
+    return { cartId, vaseId };
+  }
+
+  function checkout(cartId: string) {
+    return app.inject({ method: "POST", url: `/api/carts/${cartId}/checkout` });
+  }
+
+  function edit(cartId: string) {
+    return app.inject({ method: "POST", url: `/api/carts/${cartId}/edit` });
   }
 
   function applyCoupon(cartId: string, payload: { code: unknown }) {

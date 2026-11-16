@@ -149,7 +149,7 @@ O Shopper ganha um Cart, criado na primeira vez que adiciona um Product. No Cart
   - `percentage`: valor inteiro de 1 a 100.
   - `fixed`: valor em centavos, maior que zero.
 - Válido quando o código existe (comparação sem diferenciar maiúsculas de minúsculas) e `agora < expiração`, segundo o relógio injetado.
-- Um Coupon por Cart. Aplicar outro substitui. Remover quando não há Coupon é uma operação sem efeito que devolve o Cart.
+- Um Coupon por Cart. Aplicar outro substitui. Remover quando não há Coupon, com o Cart em `with_items` ou `checkout`, é uma operação sem efeito que devolve o Cart; num Cart `empty` vale a máquina de estados (`INVALID_CART_TRANSITION`).
 - Uso único por Shopper: ao aplicar, o Service verifica se o Shopper do Cart já tem um Order com esse Coupon (`COUPON_ALREADY_USED`). Na confirmação, a garantia de verdade é um **índice único parcial** na tabela de Orders sobre Shopper id e código do Coupon, quando há Coupon. Se o índice rejeitar o insert, o Service traduz a violação em `COUPON_ALREADY_USED` e toda a transação é desfeita, incluindo o Stock.
 - Sem limite global de usos, sem valor mínimo de Subtotal e sem acúmulo.
 

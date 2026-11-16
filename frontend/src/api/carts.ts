@@ -101,3 +101,13 @@ export function applyCoupon(cartId: string, code: string): Promise<Cart> {
 export function removeCoupon(cartId: string): Promise<Cart> {
   return requestJson<Cart>("DELETE", `/api/carts/${cartId}/coupon`);
 }
+
+/** Starts the checkout: the items lock for review (with_items → checkout). */
+export function checkoutCart(cartId: string): Promise<Cart> {
+  return requestJson<Cart>("POST", `/api/carts/${cartId}/checkout`);
+}
+
+/** Goes back to editing from the checkout, unlocking the items (checkout → with_items). */
+export function editCart(cartId: string): Promise<Cart> {
+  return requestJson<Cart>("POST", `/api/carts/${cartId}/edit`);
+}

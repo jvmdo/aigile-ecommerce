@@ -250,3 +250,54 @@ test("an unknown or expired Coupon code is refused with the Portuguese message",
   await expect(page.getByRole("alert")).toHaveText("Este cupom expirou.");
   await expect(page.locator(".cart-total")).toHaveText("Total: R$ 50,00");
 });
+
+test("checkout locks the items but keeps the Coupon editable, and going back to editing unlocks them", async ({
+  page,
+}) => {
+  await insertCoupon({
+    code: "DEZ",
+    type: "percentage",
+    value: 10,
+    expiresAt: new Date("2099-01-01T00:00:00Z"),
+  });
+  await page.goto("/");
+  await addFromCatalog(page, "Caneca Esmaltada", "2");
+  await expect(productCard(page, "Caneca Esmaltada").getByRole("status")).toBeVisible();
+  await openCart(page);
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Com itens");
+
+  await page.getByRole("button", { name: "Finalizar compra" }).click();
+
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Em checkout");
+  const row = page.locator(".cart-item").filter({ hasText: "Caneca Esmaltada" });
+  await expect(row.locator(".cart-item-quantity")).toHaveText("2");
+  await expect(page.getByLabel("Quantidade de Caneca Esmaltada")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Atualizar" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Remover Caneca Esmaltada" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Finalizar compra" })).toHaveCount(0);
+
+  await page.getByLabel("Código do cupom").fill("DEZ");
+  await page.getByRole("button", { name: "Aplicar cupom" }).click();
+  await expect(page.locator(".cart-coupon-applied")).toContainText(
+    "Cupom aplicado: DEZ (10% de desconto)",
+  );
+  await expect(page.locator(".cart-total")).toHaveText("Total: R$ 71,82");
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Em checkout");
+
+  await page.reload();
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Em checkout");
+
+  await page.getByRole("button", { name: "Voltar para editar" }).click();
+
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Com itens");
+  await page.getByLabel("Quantidade de Caneca Esmaltada").fill("3");
+  await page.getByRole("button", { name: "Atualizar" }).click();
+  await expectCartItem(page, {
+    name: "Caneca Esmaltada",
+    unitPrice: "R$ 39,90",
+    quantity: "3",
+    lineTotal: "R$ 119,70",
+  });
+  await expect(page.locator(".cart-total")).toHaveText("Total: R$ 107,73");
+  await expect(page.getByRole("button", { name: "Finalizar compra" })).toBeVisible();
+});

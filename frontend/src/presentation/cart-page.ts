@@ -1,11 +1,14 @@
 import type { Cart, CartItem } from "@aigile/shared";
 import {
   applyCoupon,
+  checkoutCart,
+  editCart,
   fetchCurrentCart,
   removeCartItem,
   removeCoupon,
   updateCartItem,
 } from "../api/carts.ts";
+import { type CartPageAction, allowedCartActions, cartStatusLabel } from "../domain/cart-status.ts";
 import { describeCoupon, validateCouponCode } from "../domain/coupon.ts";
 import { formatPrice } from "../domain/money.ts";
 import { validateQuantity } from "../domain/quantity.ts";
@@ -13,9 +16,11 @@ import { createTextElement } from "./dom.ts";
 import { apiErrorMessage, createQuantityInput } from "./quantity-input.ts";
 
 /**
- * `<cart-page>`: loads the Shopper's Cart and shows its items, each with an editable quantity
- * and a remove button, the Coupon field, and the Subtotal, Discount and Total; or the empty
- * Cart message. Every change redraws the page from the Cart the API returns.
+ * `<cart-page>`: loads the Shopper's Cart and shows its status, its items, the Coupon field,
+ * the Subtotal, Discount and Total, and the buttons that move it along; or the empty Cart
+ * message. Which controls appear follows the actions the status allows (Domain): with_items
+ * edits the items and offers "Finalizar compra"; checkout shows them read-only and offers
+ * "Voltar para editar". Every change redraws the page from the Cart the API returns.
  */
 export class CartPage extends HTMLElement {
   connectedCallback(): void {
@@ -76,25 +81,34 @@ export class CartPage extends HTMLElement {
       }
     };
 
+    const actions = allowedCartActions(cart.status);
+    const editItems = actions.includes("editItems");
+
     const table = document.createElement("table");
     table.className = "cart-items";
     const headerRow = document.createElement("tr");
-    for (const label of ["Produto", "Preço unitário", "Quantidade", "Subtotal do item", ""]) {
+    const headers = ["Produto", "Preço unitário", "Quantidade", "Subtotal do item"];
+    for (const label of editItems ? [...headers, ""] : headers) {
       headerRow.append(createTextElement("th", "", label));
     }
     table.createTHead().append(headerRow);
 
     const body = table.createTBody();
     for (const item of cart.items) {
-      body.append(createItemRow(cart.id, item, feedback, change));
+      body.append(
+        editItems
+          ? createEditableItemRow(cart.id, item, feedback, change)
+          : createReadOnlyItemRow(item),
+      );
     }
 
-    this.replaceChildren(
-      feedback,
-      table,
-      createCouponSection(cart, feedback, change),
-      createSummary(cart),
-    );
+    const status = createTextElement("p", "cart-status", `Estado: ${cartStatusLabel(cart.status)}`);
+    const parts: HTMLElement[] = [status, feedback, table];
+    if (actions.includes("editCoupon")) {
+      parts.push(createCouponSection(cart, feedback, change));
+    }
+    parts.push(createSummary(cart), createTransitions(cart, actions, change));
+    this.replaceChildren(...parts);
   }
 }
 
@@ -148,6 +162,33 @@ function createCouponSection(cart: Cart, feedback: HTMLElement, change: Change):
   return section;
 }
 
+/** The buttons that move the Cart to another status, as far as its status allows. */
+function createTransitions(
+  cart: Cart,
+  actions: readonly CartPageAction[],
+  change: Change,
+): HTMLElement {
+  const section = document.createElement("div");
+  section.className = "cart-transitions";
+  const transitions: [CartPageAction, string, (cartId: string) => Promise<Cart>][] = [
+    ["checkout", "Finalizar compra", checkoutCart],
+    ["edit", "Voltar para editar", editCart],
+  ];
+  for (const [action, label, request] of transitions) {
+    if (!actions.includes(action)) {
+      continue;
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.addEventListener("click", async () => {
+      await change(button, () => request(cart.id));
+    });
+    section.append(button);
+  }
+  return section;
+}
+
 /** Subtotal, Discount and Total, all computed by the server. */
 function createSummary(cart: Cart): HTMLElement {
   const summary = document.createElement("div");
@@ -160,7 +201,21 @@ function createSummary(cart: Cart): HTMLElement {
   return summary;
 }
 
-function createItemRow(
+/** An item locked for review (checkout): its quantity is plain text, with no controls. */
+function createReadOnlyItemRow(item: CartItem): HTMLTableRowElement {
+  const row = document.createElement("tr");
+  row.className = "cart-item";
+  row.append(
+    createTextElement("td", "cart-item-name", item.name),
+    createTextElement("td", "cart-item-unit-price", formatPrice(item.unitPriceCents)),
+    createTextElement("td", "cart-item-quantity", String(item.quantity)),
+    createTextElement("td", "cart-item-line-total", formatPrice(item.lineTotalCents)),
+  );
+  return row;
+}
+
+/** An item open for editing (with_items): editable quantity and a remove button. */
+function createEditableItemRow(
   cartId: string,
   item: CartItem,
   feedback: HTMLElement,

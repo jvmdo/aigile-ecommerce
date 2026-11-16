@@ -42,8 +42,12 @@ Não é preciso criar `.env`: todas as variáveis têm valor padrão (veja [`.en
 | `DELETE /api/carts/:id/items/:productId` | Remove o item e devolve `200` com o Cart; remover o último leva o Cart a `empty` e remove o Coupon aplicado. `404 CART_ITEM_NOT_FOUND` se o Product não está no Cart. |
 | `PUT /api/carts/:id/coupon` | Corpo `{ "code" }` (sem diferenciar maiúsculas de minúsculas). Aplica o Coupon, substituindo outro, e devolve `200` com o Cart, `coupon: { code, type, value }`, `discountCents` e `totalCents`. `422 COUPON_NOT_FOUND` ou `COUPON_EXPIRED`; `409 CART_EMPTY` se o Cart está `empty`. Não há API para criar Coupons: eles vêm do seed ou dos testes. |
 | `DELETE /api/carts/:id/coupon` | Remove o Coupon e devolve `200` com o Cart; sem Coupon, apenas devolve o Cart. |
+| `POST /api/carts/:id/checkout` | Leva o Cart de `with_items` a `checkout` e devolve `200` com o Cart: os itens ficam travados, o Coupon continua editável. `409 CART_EMPTY` se o Cart está `empty`. |
+| `POST /api/carts/:id/edit` | Volta de `checkout` para `with_items` e devolve `200` com o Cart, destravando os itens. |
 
 Toda rota de Cart devolve o Cart completo: `{ "id", "status", "items": [{ "productId", "name", "unitPriceCents", "quantity", "lineTotalCents" }], "coupon", "subtotalCents", "discountCents", "totalCents" }`, com os itens na ordem em que entraram. Os valores são calculados pelo servidor, em centavos. `coupon` é `{ "code", "type", "value" }` do Coupon aplicado, ou `null`; o Discount percentual é `floor(subtotalCents × value / 100)`, o fixo é `min(value, subtotalCents)`, e `totalCents = subtotalCents − discountCents`, nunca negativo.
+
+O status segue a máquina de estados do Cart: em `checkout` só se aplica ou remove o Coupon e se volta a editar; qualquer ação que o status não permite (alterar itens em `checkout`, alterar ou remover itens e remover o Coupon de um Cart `empty`, `edit` num Cart `with_items`, `checkout` repetido, ...) responde `409 INVALID_CART_TRANSITION` com `details: { "status" }`.
 
 Todo erro usa o mesmo envelope: `{ "error": { "code", "message", "details"? } }`. Entrada malformada (inclusive ids que não são UUID) → `400` (`VALIDATION_ERROR`); regra de negócio violada → `404`, `409` ou `422` com um código estável (`CART_NOT_FOUND`, `INSUFFICIENT_STOCK`, ...); rota inexistente → `404`; erro inesperado → `500` (`INTERNAL_ERROR`), sem stack trace. Os schemas das respostas ficam no pacote `shared`.
 
