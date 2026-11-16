@@ -27,10 +27,20 @@ export const CartItem = Type.Object({
 
 export type CartItem = Static<typeof CartItem>;
 
+/** Coupon Discount kinds: a percentage of the Subtotal, or a fixed amount in cents (FRD, "Regras do Coupon"). */
+export const couponTypes = ["percentage", "fixed"] as const;
+
+export const CouponType = Type.Union(couponTypes.map((type) => Type.Literal(type)));
+
+export type CouponType = Static<typeof CouponType>;
+
+/** The highest `value` of a `percentage` Coupon. */
+export const MAX_COUPON_PERCENTAGE = 100;
+
 /** The Coupon applied to a Cart: `value` is a percentage (1 to 100) or integer cents, by `type`. */
 export const AppliedCoupon = Type.Object({
   code: Type.String(),
-  type: Type.Union([Type.Literal("percentage"), Type.Literal("fixed")]),
+  type: CouponType,
   value: Type.Integer({ minimum: 1 }),
 });
 
@@ -86,3 +96,13 @@ export const UpdateCartItemBody = Type.Object({
 });
 
 export type UpdateCartItemBody = Static<typeof UpdateCartItemBody>;
+
+/** The longest Coupon code the API accepts. */
+export const MAX_COUPON_CODE_LENGTH = 64;
+
+/** `PUT /api/carts/:id/coupon`: applies the Coupon with this code (any letter case), replacing any other. */
+export const ApplyCouponBody = Type.Object({
+  code: Type.String({ minLength: 1, maxLength: MAX_COUPON_CODE_LENGTH }),
+});
+
+export type ApplyCouponBody = Static<typeof ApplyCouponBody>;

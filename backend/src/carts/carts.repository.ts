@@ -1,7 +1,7 @@
-import type { CartStatus } from "@aigile/shared";
+import type { CartStatus, CouponType } from "@aigile/shared";
 import { and, asc, eq, sql } from "drizzle-orm";
 import type { Database } from "../db/connection.ts";
-import { cartItems, carts, products } from "../db/schema.ts";
+import { cartItems, carts, coupons, products } from "../db/schema.ts";
 
 /** A Cart as stored, before the Service computes its money fields. */
 export type CartRecord = {
@@ -9,6 +9,16 @@ export type CartRecord = {
   shopperId: string;
   status: CartStatus;
   items: CartItemRecord[];
+  coupon: CouponRecord | null;
+};
+
+/** A Coupon as stored; its code is in upper case. */
+export type CouponRecord = {
+  id: string;
+  code: string;
+  type: CouponType;
+  value: number;
+  expiresAt: Date;
 };
 
 export type CartItemRecord = {
@@ -33,6 +43,10 @@ export type CartsRepository = {
   updateItemQuantity: (item: CartItemKey, quantity: number, cart: CartChange) => Promise<void>;
   /** Deletes a Cart Item and records the Cart's change, in one transaction. */
   removeItem: (item: CartItemKey, cart: CartChange) => Promise<void>;
+  /** The Coupon with exactly this (upper-case) code, or null when there is none. */
+  findCouponByCode: (code: string) => Promise<CouponRecord | null>;
+  /** Sets the Coupon the Cart carries (null for none) and its last change; the status is left as it is. */
+  setCoupon: (cartId: string, couponId: string | null, changedAt: Date) => Promise<void>;
 };
 
 /** Identifies a Cart Item: a Cart holds at most one per Product. */
@@ -41,10 +55,14 @@ export type CartItemKey = {
   productId: string;
 };
 
-/** What a successful mutation records on the Cart: the status the Service chose and when. */
+/**
+ * What a successful item mutation records on the Cart: the status the Service chose and when.
+ * `couponId: null` also removes the Coupon (the last item left); left out, the Coupon stays.
+ */
 export type CartChange = {
   status: CartStatus;
   changedAt: Date;
+  couponId?: string | null;
 };
 
 export type NewCartItem = {
@@ -68,11 +86,23 @@ export function createCartsRepository(db: Database): CartsRepository {
     },
 
     findById: async (id) => {
-      const [cart] = await db
-        .select({ id: carts.id, shopperId: carts.shopperId, status: carts.status })
+      const [row] = await db
+        .select({
+          id: carts.id,
+          shopperId: carts.shopperId,
+          status: carts.status,
+          coupon: {
+            id: coupons.id,
+            code: coupons.code,
+            type: coupons.type,
+            value: coupons.value,
+            expiresAt: coupons.expiresAt,
+          },
+        })
         .from(carts)
+        .leftJoin(coupons, eq(coupons.id, carts.couponId))
         .where(eq(carts.id, id));
-      if (cart === undefined) {
+      if (row === undefined) {
         return null;
       }
       const items = await db
@@ -86,7 +116,7 @@ export function createCartsRepository(db: Database): CartsRepository {
         .innerJoin(products, eq(products.id, cartItems.productId))
         .where(eq(cartItems.cartId, id))
         .orderBy(asc(cartItems.insertionOrder));
-      return { ...cart, items };
+      return { ...row, items };
     },
 
     addItem: (item, { status, changedAt }) =>
@@ -112,6 +142,18 @@ export function createCartsRepository(db: Database): CartsRepository {
         await tx.delete(cartItems).where(matchesItem(item));
         await recordChange(tx, item.cartId, change);
       }),
+
+    findCouponByCode: async (code) => {
+      const [coupon] = await db.select().from(coupons).where(eq(coupons.code, code));
+      return coupon ?? null;
+    },
+
+    setCoupon: async (cartId, couponId, changedAt) => {
+      await db
+        .update(carts)
+        .set({ couponId, lastChangedAt: changedAt })
+        .where(eq(carts.id, cartId));
+    },
   };
 }
 
@@ -124,7 +166,10 @@ function matchesItem({ cartId, productId }: CartItemKey) {
 async function recordChange(
   tx: Transaction,
   cartId: string,
-  { status, changedAt }: CartChange,
+  { status, changedAt, couponId }: CartChange,
 ): Promise<void> {
-  await tx.update(carts).set({ status, lastChangedAt: changedAt }).where(eq(carts.id, cartId));
+  await tx
+    .update(carts)
+    .set({ status, lastChangedAt: changedAt, couponId })
+    .where(eq(carts.id, cartId));
 }

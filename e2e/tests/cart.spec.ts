@@ -1,5 +1,5 @@
 import { type Page, expect, test } from "@playwright/test";
-import { replaceProducts, setStock } from "../support/database.ts";
+import { insertCoupon, replaceProducts, setStock } from "../support/database.ts";
 
 // Each test gets a new browser context, so a new Shopper with no Cart.
 test.beforeEach(async () => {
@@ -194,4 +194,59 @@ test("removing items keeps the others, and removing the last one shows the empty
   await expect(page.getByText("Seu carrinho está vazio.")).toBeVisible();
   await page.reload();
   await expect(page.getByText("Seu carrinho está vazio.")).toBeVisible();
+});
+
+test("applying a Coupon shows the Discount and the Total, and removing it restores the Total", async ({
+  page,
+}) => {
+  await insertCoupon({
+    code: "DEZ",
+    type: "percentage",
+    value: 10,
+    expiresAt: new Date("2099-01-01T00:00:00Z"),
+  });
+  await page.goto("/");
+  await addFromCatalog(page, "Caneca Esmaltada", "2");
+  await expect(productCard(page, "Caneca Esmaltada").getByRole("status")).toBeVisible();
+  await openCart(page);
+
+  await page.getByLabel("Código do cupom").fill("dez");
+  await page.getByRole("button", { name: "Aplicar cupom" }).click();
+
+  await expect(page.locator(".cart-coupon-applied")).toContainText(
+    "Cupom aplicado: DEZ (10% de desconto)",
+  );
+  await expect(page.locator(".cart-subtotal")).toHaveText("Subtotal: R$ 79,80");
+  await expect(page.locator(".cart-discount")).toHaveText("Desconto: R$ 7,98");
+  await expect(page.locator(".cart-total")).toHaveText("Total: R$ 71,82");
+
+  await page.getByRole("button", { name: "Remover cupom" }).click();
+
+  await expect(page.locator(".cart-coupon-applied")).toHaveCount(0);
+  await expect(page.locator(".cart-discount")).toHaveText("Desconto: R$ 0,00");
+  await expect(page.locator(".cart-total")).toHaveText("Total: R$ 79,80");
+});
+
+test("an unknown or expired Coupon code is refused with the Portuguese message", async ({
+  page,
+}) => {
+  await insertCoupon({
+    code: "VENCIDO",
+    type: "fixed",
+    value: 1000,
+    expiresAt: new Date("2020-01-01T00:00:00Z"),
+  });
+  await page.goto("/");
+  await addFromCatalog(page, "Vaso de Barro", "1");
+  await expect(productCard(page, "Vaso de Barro").getByRole("status")).toBeVisible();
+  await openCart(page);
+
+  await page.getByLabel("Código do cupom").fill("NAOEXISTE");
+  await page.getByRole("button", { name: "Aplicar cupom" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Cupom não encontrado.");
+
+  await page.getByLabel("Código do cupom").fill("VENCIDO");
+  await page.getByRole("button", { name: "Aplicar cupom" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Este cupom expirou.");
+  await expect(page.locator(".cart-total")).toHaveText("Total: R$ 50,00");
 });

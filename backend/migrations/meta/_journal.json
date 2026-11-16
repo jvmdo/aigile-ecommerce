@@ -15,6 +15,13 @@
       "when": 1794856002566,
       "tag": "0001_create_carts",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794858231509,
+      "tag": "0002_create_coupons",
+      "breakpoints": true
     }
   ]
 }

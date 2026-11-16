@@ -85,7 +85,16 @@ product-card.sold-out {
   margin-left: 0.5rem;
 }
 
-.cart-subtotal {
+.cart-coupon-form button,
+.cart-coupon-applied button {
+  margin-left: 0.5rem;
+}
+
+.cart-summary p {
+  margin: 0.25rem 0;
+}
+
+.cart-total {
   font-weight: bold;
 }
 

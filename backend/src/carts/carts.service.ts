@@ -8,7 +8,7 @@ import {
 import type { Clock } from "../clock.ts";
 import { DomainError } from "../domain-error.ts";
 import type { ProductsRepository } from "../products/products.repository.ts";
-import type { CartRecord, CartsRepository } from "./carts.repository.ts";
+import type { CartChange, CartRecord, CartsRepository, CouponRecord } from "./carts.repository.ts";
 
 export type CartsService = {
   createCart: (shopperId: string) => Promise<Cart>;
@@ -16,6 +16,8 @@ export type CartsService = {
   addItem: (cartId: string, item: AddCartItemBody) => Promise<Cart>;
   updateItemQuantity: (cartId: string, productId: string, quantity: number) => Promise<Cart>;
   removeItem: (cartId: string, productId: string) => Promise<Cart>;
+  applyCoupon: (cartId: string, code: string) => Promise<Cart>;
+  removeCoupon: (cartId: string) => Promise<Cart>;
 };
 
 export type CartsServiceDependencies = {
@@ -32,7 +34,7 @@ export function createCartsService({
   return {
     createCart: async (shopperId) => {
       const id = await carts.create(shopperId, clock.now());
-      return toCart({ id, shopperId, status: "empty", items: [] });
+      return toCart({ id, shopperId, status: "empty", items: [], coupon: null });
     },
 
     getCart: async (id) => toCart(await findCart(carts, id)),
@@ -78,8 +80,39 @@ export function createCartsService({
     removeItem: async (cartId, productId) => {
       const cart = await findCart(carts, cartId);
       assertInCart(cart, productId);
-      const status = cart.items.length === 1 ? "empty" : "with_items";
-      await carts.removeItem({ cartId, productId }, { status, changedAt: clock.now() });
+      const removesLastItem = cart.items.length === 1;
+      // An empty Cart never carries a Coupon (FRD, "Cart Items").
+      const change: CartChange = removesLastItem
+        ? { status: "empty", changedAt: clock.now(), couponId: null }
+        : { status: "with_items", changedAt: clock.now() };
+      await carts.removeItem({ cartId, productId }, change);
+      return toCart(await findCart(carts, cartId));
+    },
+
+    applyCoupon: async (cartId, code) => {
+      const cart = await findCart(carts, cartId);
+      if (cart.status === "empty") {
+        throw new DomainError("CART_EMPTY", "Não é possível aplicar um cupom a um carrinho vazio.");
+      }
+      const coupon = await carts.findCouponByCode(code.toUpperCase());
+      if (coupon === null) {
+        throw new DomainError("COUPON_NOT_FOUND", "Cupom não encontrado.");
+      }
+      const now = clock.now();
+      if (now >= coupon.expiresAt) {
+        throw new DomainError("COUPON_EXPIRED", "Este cupom expirou.");
+      }
+      await carts.setCoupon(cartId, coupon.id, now);
+      return toCart(await findCart(carts, cartId));
+    },
+
+    removeCoupon: async (cartId) => {
+      const cart = await findCart(carts, cartId);
+      // Removing when there is no Coupon has no effect, not even on the last change.
+      if (cart.coupon === null) {
+        return toCart(cart);
+      }
+      await carts.setCoupon(cartId, null, clock.now());
       return toCart(await findCart(carts, cartId));
     },
   };
@@ -119,13 +152,22 @@ function toCart(record: CartRecord): Cart {
     lineTotalCents: item.quantity * item.unitPriceCents,
   }));
   const subtotalCents = items.reduce((sum, item) => sum + item.lineTotalCents, 0);
+  const coupon = record.coupon;
+  const discountCents = coupon === null ? 0 : discountOf(coupon, subtotalCents);
   return {
     id: record.id,
     status: record.status,
     items,
-    coupon: null,
+    coupon: coupon === null ? null : { code: coupon.code, type: coupon.type, value: coupon.value },
     subtotalCents,
-    discountCents: 0,
-    totalCents: subtotalCents,
+    discountCents,
+    totalCents: subtotalCents - discountCents,
   };
+}
+
+/** A percentage is rounded down to the cent; a fixed amount never exceeds the Subtotal. */
+function discountOf(coupon: Pick<CouponRecord, "type" | "value">, subtotalCents: number): number {
+  return coupon.type === "percentage"
+    ? Math.floor((subtotalCents * coupon.value) / 100)
+    : Math.min(coupon.value, subtotalCents);
 }

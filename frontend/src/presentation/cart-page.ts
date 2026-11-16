@@ -1,5 +1,12 @@
 import type { Cart, CartItem } from "@aigile/shared";
-import { fetchCurrentCart, removeCartItem, updateCartItem } from "../api/carts.ts";
+import {
+  applyCoupon,
+  fetchCurrentCart,
+  removeCartItem,
+  removeCoupon,
+  updateCartItem,
+} from "../api/carts.ts";
+import { describeCoupon, validateCouponCode } from "../domain/coupon.ts";
 import { formatPrice } from "../domain/money.ts";
 import { validateQuantity } from "../domain/quantity.ts";
 import { createTextElement } from "./dom.ts";
@@ -7,8 +14,8 @@ import { apiErrorMessage, createQuantityInput } from "./quantity-input.ts";
 
 /**
  * `<cart-page>`: loads the Shopper's Cart and shows its items, each with an editable quantity
- * and a remove button, and the Subtotal; or the empty Cart message. Every change redraws the
- * page from the Cart the API returns.
+ * and a remove button, the Coupon field, and the Subtotal, Discount and Total; or the empty
+ * Cart message. Every change redraws the page from the Cart the API returns.
  */
 export class CartPage extends HTMLElement {
   connectedCallback(): void {
@@ -58,7 +65,7 @@ export class CartPage extends HTMLElement {
      * Runs a change against the API with its button disabled, then redraws from the returned
      * Cart or shows why it failed.
      */
-    const change = async (button: HTMLButtonElement, request: () => Promise<Cart>) => {
+    const change: Change = async (button, request) => {
       button.disabled = true;
       try {
         this.show(await request());
@@ -82,20 +89,82 @@ export class CartPage extends HTMLElement {
       body.append(createItemRow(cart.id, item, feedback, change));
     }
 
-    const subtotal = createTextElement(
-      "p",
-      "cart-subtotal",
-      `Subtotal: ${formatPrice(cart.subtotalCents)}`,
+    this.replaceChildren(
+      feedback,
+      table,
+      createCouponSection(cart, feedback, change),
+      createSummary(cart),
     );
-    this.replaceChildren(feedback, table, subtotal);
   }
+}
+
+type Change = (button: HTMLButtonElement, request: () => Promise<Cart>) => Promise<void>;
+
+/** The applied Coupon with its remove button, if any, and the field to apply one. */
+function createCouponSection(cart: Cart, feedback: HTMLElement, change: Change): HTMLElement {
+  const section = document.createElement("section");
+  section.className = "cart-coupon";
+
+  if (cart.coupon !== null) {
+    const applied = createTextElement(
+      "p",
+      "cart-coupon-applied",
+      `Cupom aplicado: ${describeCoupon(cart.coupon)} `,
+    );
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Remover cupom";
+    remove.addEventListener("click", async () => {
+      await change(remove, () => removeCoupon(cart.id));
+    });
+    applied.append(remove);
+    section.append(applied);
+  }
+
+  const form = document.createElement("form");
+  form.className = "cart-coupon-form";
+  form.noValidate = true;
+  const label = document.createElement("label");
+  label.textContent = "Código do cupom ";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.name = "coupon";
+  input.autocomplete = "off";
+  label.append(input);
+  const apply = document.createElement("button");
+  apply.type = "submit";
+  apply.textContent = "Aplicar cupom";
+  form.append(label, apply);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const check = validateCouponCode(input.value);
+    if (!check.valid) {
+      showError(feedback, check.message);
+      return;
+    }
+    await change(apply, () => applyCoupon(cart.id, check.code));
+  });
+  section.append(form);
+  return section;
+}
+
+/** Subtotal, Discount and Total, all computed by the server. */
+function createSummary(cart: Cart): HTMLElement {
+  const summary = document.createElement("div");
+  summary.className = "cart-summary";
+  summary.append(
+    createTextElement("p", "cart-subtotal", `Subtotal: ${formatPrice(cart.subtotalCents)}`),
+    createTextElement("p", "cart-discount", `Desconto: ${formatPrice(cart.discountCents)}`),
+    createTextElement("p", "cart-total", `Total: ${formatPrice(cart.totalCents)}`),
+  );
+  return summary;
 }
 
 function createItemRow(
   cartId: string,
   item: CartItem,
   feedback: HTMLElement,
-  change: (button: HTMLButtonElement, request: () => Promise<Cart>) => Promise<void>,
+  change: Change,
 ): HTMLTableRowElement {
   const row = document.createElement("tr");
   row.className = "cart-item";

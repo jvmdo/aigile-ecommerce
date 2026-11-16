@@ -1,4 +1,10 @@
-import type { AddCartItemBody, Cart, CreateCartBody, UpdateCartItemBody } from "@aigile/shared";
+import type {
+  AddCartItemBody,
+  ApplyCouponBody,
+  Cart,
+  CreateCartBody,
+  UpdateCartItemBody,
+} from "@aigile/shared";
 import { readStored, removeStored, writeStored } from "./browser-storage.ts";
 import { ApiError, requestJson } from "./http.ts";
 
@@ -83,4 +89,15 @@ export function updateCartItem(cartId: string, productId: string, quantity: numb
 /** Removes a Cart Item and returns the updated Cart (`empty` after the last one). */
 export function removeCartItem(cartId: string, productId: string): Promise<Cart> {
   return requestJson<Cart>("DELETE", `/api/carts/${cartId}/items/${productId}`);
+}
+
+/** Applies the Coupon with this code, replacing any other, and returns the Cart with its Discount. */
+export function applyCoupon(cartId: string, code: string): Promise<Cart> {
+  const body: ApplyCouponBody = { code };
+  return requestJson<Cart>("PUT", `/api/carts/${cartId}/coupon`, body);
+}
+
+/** Removes the applied Coupon (a no-op when there is none) and returns the Cart. */
+export function removeCoupon(cartId: string): Promise<Cart> {
+  return requestJson<Cart>("DELETE", `/api/carts/${cartId}/coupon`);
 }

@@ -1,4 +1,9 @@
-import { MAX_ITEM_QUANTITY, cartStatuses } from "@aigile/shared";
+import {
+  MAX_COUPON_PERCENTAGE,
+  MAX_ITEM_QUANTITY,
+  cartStatuses,
+  couponTypes,
+} from "@aigile/shared";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -28,6 +33,30 @@ export const products = pgTable(
   ],
 );
 
+export const coupons = pgTable(
+  "coupons",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Stored in upper case so the lookup is case-insensitive (FRD, "Regras do Coupon").
+    code: text("code").notNull().unique("coupons_code_unique"),
+    type: text("type", { enum: couponTypes }).notNull(),
+    // A percentage (1 to 100) or integer cents greater than zero, by type.
+    value: integer("value").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    check("coupons_code_upper_case", sql`${table.code} = upper(${table.code})`),
+    check(
+      "coupons_type_known",
+      sql`${table.type} IN (${sql.raw(couponTypes.map((type) => `'${type}'`).join(", "))})`,
+    ),
+    check(
+      "coupons_value_matches_type",
+      sql`(${table.type} = 'percentage' AND ${table.value} BETWEEN 1 AND ${sql.raw(String(MAX_COUPON_PERCENTAGE))}) OR (${table.type} = 'fixed' AND ${table.value} > 0)`,
+    ),
+  ],
+);
+
 export const carts = pgTable(
   "carts",
   {
@@ -37,6 +66,8 @@ export const carts = pgTable(
     status: text("status", { enum: cartStatuses }).notNull().default("empty"),
     // Set from the injected clock on every successful mutation; reads leave it alone.
     lastChangedAt: timestamp("last_changed_at", { withTimezone: true }).notNull(),
+    // The applied Coupon, at most one; null when there is none.
+    couponId: uuid("coupon_id").references(() => coupons.id),
   },
   (table) => [
     check(

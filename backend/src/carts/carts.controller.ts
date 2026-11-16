@@ -1,5 +1,6 @@
 import {
   AddCartItemBody,
+  ApplyCouponBody,
   Cart,
   CartItemParams,
   CartParams,
@@ -40,5 +41,17 @@ export function registerCartRoutes(app: App, service: CartsService): void {
     "/api/carts/:id/items/:productId",
     { schema: { params: CartItemParams, response: { 200: Cart } } },
     async ({ params }) => service.removeItem(params.id, params.productId),
+  );
+
+  app.put(
+    "/api/carts/:id/coupon",
+    { schema: { params: CartParams, body: ApplyCouponBody, response: { 200: Cart } } },
+    async ({ params, body }) => service.applyCoupon(params.id, body.code),
+  );
+
+  app.delete(
+    "/api/carts/:id/coupon",
+    { schema: { params: CartParams, response: { 200: Cart } } },
+    async ({ params }) => service.removeCoupon(params.id),
   );
 }
