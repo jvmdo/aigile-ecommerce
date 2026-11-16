@@ -1,2 +1,4 @@
 // API contracts (TypeBox schemas and derived types) live here. See ADR 0007.
-export {};
+export * from "./error.ts";
+export * from "./health.ts";
+export * from "./product.ts";

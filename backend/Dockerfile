@@ -6,9 +6,22 @@ COPY shared/package.json shared/
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
 
-# Integration tests: backend with dev dependencies (Vitest).
-FROM base AS test
+# Backend with dev dependencies (drizzle-kit, Vitest).
+FROM base AS dev-deps
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 RUN npm ci --workspace @aigile/backend --include-workspace-root=false
+
+# One-shot migrations: applies backend/migrations with drizzle-kit and exits.
+FROM dev-deps AS migrate
+COPY backend/drizzle.config.ts backend/
+COPY backend/src/db backend/src/db
+COPY backend/migrations backend/migrations
+USER node
+WORKDIR /app/backend
+CMD ["npx", "drizzle-kit", "migrate"]
+
+# Integration tests: migrate and clean ecommerce_test, then run Vitest.
+FROM dev-deps AS test
 COPY tsconfig.base.json ./
 COPY shared/ shared/
 COPY backend/ backend/

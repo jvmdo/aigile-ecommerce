@@ -2,11 +2,9 @@ import pg from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.ts";
 import { createDatabase } from "../../src/db/connection.ts";
+import { requireTestDatabaseUrl } from "../support/test-database-url.ts";
 
-const testDatabaseUrl = process.env.TEST_DATABASE_URL;
-if (!testDatabaseUrl) {
-  throw new Error("TEST_DATABASE_URL must point at the ecommerce_test database");
-}
+const testDatabaseUrl = requireTestDatabaseUrl();
 
 /** Simulates a database restart: the server terminates every other session on the database. */
 async function dropOtherConnectionsTo(connectionString: string): Promise<void> {
