@@ -9,7 +9,7 @@ Specs and tickets for this repo live as markdown files in `docs/`, committed wit
 - **Blueprint** (from `/to-tickets`): `docs/<feature-slug>/blueprint-<feature-slug>.md`, an index of the approved breakdown: each ticket's number, title, "Blocked by" and a link to its file.
 - **Tickets**: one file per ticket at `docs/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` in dependency order, never a single combined file.
 - **Scaffolding exception**: the spec is `docs/scaffolding-specification.md` and the blueprint is `docs/scaffolding-blueprint.md` (repo `docs/` root); its tickets go in `docs/scaffolding/issues/`.
-- Triage state is a `Status:` line near the top of each ticket (see `triage-labels.md`).
+- Triage state is a `Status:` line near the top of each ticket (see `triage-labels.md`). A closed ticket has `Status: resolved`, which is not a triage role.
 - Comments append to the bottom of the file under a `## Comments` heading.
 
 ## When a skill says "publish to the issue tracker"
@@ -19,6 +19,18 @@ Write the file at the path above, creating the directory if needed. A spec goes 
 ## When a skill says "fetch the relevant ticket"
 
 Read the file at the referenced path. The user will normally pass the path or the ticket number directly.
+
+## When a skill says "close" or "resolve" a ticket
+
+Nothing closes a ticket automatically: a `Closes <path>` line in a commit message is only a pointer, so the ticket file must be edited by hand. Whoever finishes a ticket (`/implement`, `/tdd`, `/implement-spec`) does this:
+
+1. Tick every acceptance criterion that was met (`- [ ]` → `- [x]`).
+2. Change the status line to `Status: resolved`.
+3. Commit these edits **in the same commit** as the implementation, the one whose message ends with `Closes docs/<feature-slug>/issues/<NN>-<slug>.md`.
+
+If a criterion was deliberately changed or deferred, leave it unticked and explain why under `## Comments`.
+
+If a later `/code-review` finds that a resolved ticket is incomplete, either set it back to `Status: ready-for-agent` or add the finding under `## Comments` and fix it in a follow-up commit.
 
 ## Wayfinding operations
 

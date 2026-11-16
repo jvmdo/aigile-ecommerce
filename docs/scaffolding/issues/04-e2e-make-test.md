@@ -6,12 +6,12 @@
 
 **Blocked by:** 03 (Página do catálogo)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Serviço Playwright no compose com a imagem oficial, ativado só por profile de teste, no override `docker-compose.e2e.yml` (ADR 0004).
-- [ ] Os testes E2E inserem os próprios dados (sem depender do seed do Passo 7).
-- [ ] E2E verifica: a página do catálogo exibe os Products do banco com preço em reais; o selo "Esgotado" aparece para Stock zero; `/health` responde `200` via nginx.
-- [ ] `make test-e2e` sobe o que for necessário, roda os testes e devolve o código de saída correto.
-- [ ] `make test` roda unidade, integração e E2E em containers e falha se qualquer nível falhar.
-- [ ] `make test` funciona numa máquina com apenas Docker.
-- [ ] README atualizado com `make test` como comando da suíte completa e `make test-e2e`.
+- [x] Serviço Playwright no compose com a imagem oficial, ativado só por profile de teste, no override `docker-compose.e2e.yml` (ADR 0004).
+- [x] Os testes E2E inserem os próprios dados (sem depender do seed do Passo 7).
+- [x] E2E verifica: a página do catálogo exibe os Products do banco com preço em reais; o selo "Esgotado" aparece para Stock zero; `/health` responde `200` via nginx.
+- [x] `make test-e2e` sobe o que for necessário, roda os testes e devolve o código de saída correto.
+- [x] `make test` roda unidade, integração e E2E em containers e falha se qualquer nível falhar.
+- [x] `make test` funciona numa máquina com apenas Docker.
+- [x] README atualizado com `make test` como comando da suíte completa e `make test-e2e`.

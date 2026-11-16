@@ -6,12 +6,12 @@
 
 **Blocked by:** 03 (Página do catálogo)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `make dev` sobe só o serviço `db`, espera o healthcheck e aplica as migrations.
-- [ ] Backend roda com `node --watch` na porta 8800 e o Vite dev server na porta 5173, em paralelo via `concurrently` (devDependency da raiz), com logs prefixados.
-- [ ] O Vite dev server faz proxy de `/api` e `/health` para a porta 8800, com os mesmos caminhos de produção.
-- [ ] Alterar um arquivo do backend reinicia o backend; alterar um arquivo do frontend recarrega a página.
-- [ ] Ctrl+C encerra os dois processos e deixa o Postgres rodando; `make down` derruba tudo.
-- [ ] `npm run dev` na raiz tem o mesmo efeito, depois de o banco estar de pé.
-- [ ] README atualizado com o fluxo de `make dev`.
+- [x] `make dev` sobe só o serviço `db`, espera o healthcheck e aplica as migrations.
+- [x] Backend roda com `node --watch` na porta 8800 e o Vite dev server na porta 5173, em paralelo via `concurrently` (devDependency da raiz), com logs prefixados.
+- [x] O Vite dev server faz proxy de `/api` e `/health` para a porta 8800, com os mesmos caminhos de produção.
+- [x] Alterar um arquivo do backend reinicia o backend; alterar um arquivo do frontend recarrega a página.
+- [x] Ctrl+C encerra os dois processos e deixa o Postgres rodando; `make down` derruba tudo.
+- [x] `npm run dev` na raiz tem o mesmo efeito, depois de o banco estar de pé.
+- [x] README atualizado com o fluxo de `make dev`.

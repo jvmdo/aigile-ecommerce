@@ -6,14 +6,14 @@
 
 **Blocked by:** 01 (Esqueleto de pé: `/health` de ponta a ponta)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Tabela de Products via migration do Drizzle: `id` UUID gerado pelo banco, `name` obrigatório, `description`, `price_cents` inteiro maior ou igual a 0 e `stock` inteiro maior ou igual a 0, com constraints de check (ADRs 0002, 0005, 0006).
-- [ ] Serviço `migrate` no compose: aplica as migrations e termina; a `api` só sobe depois de ele concluir com sucesso. `make migrate` disponível.
-- [ ] Pacote `shared` exporta os schemas TypeBox (e os tipos derivados) de Product, da resposta da listagem, da resposta do health e do envelope de erro.
-- [ ] O Fastify usa o type provider de TypeBox, com validação e serialização a partir dos schemas do `shared`.
-- [ ] Módulo `products` com Controller, Service e Repository; o Repository encapsula o Drizzle.
-- [ ] `GET /api/products` devolve todos os Products ordenados por nome (crescente), sem paginação.
-- [ ] Erros de validação de schema viram `400` e erros inesperados viram `500`, ambos no envelope de erro e sem stack trace. O teste do `400` fica para a primeira rota com entrada (feature do Cart).
-- [ ] Testes de integração no `ecommerce_test` (migrado e limpo a cada execução): campos do contrato, ordem por nome, catálogo vazio, Product com Stock zero.
-- [ ] README atualizado com `GET /api/products` e `make migrate`.
+- [x] Tabela de Products via migration do Drizzle: `id` UUID gerado pelo banco, `name` obrigatório, `description`, `price_cents` inteiro maior ou igual a 0 e `stock` inteiro maior ou igual a 0, com constraints de check (ADRs 0002, 0005, 0006).
+- [x] Serviço `migrate` no compose: aplica as migrations e termina; a `api` só sobe depois de ele concluir com sucesso. `make migrate` disponível.
+- [x] Pacote `shared` exporta os schemas TypeBox (e os tipos derivados) de Product, da resposta da listagem, da resposta do health e do envelope de erro.
+- [x] O Fastify usa o type provider de TypeBox, com validação e serialização a partir dos schemas do `shared`.
+- [x] Módulo `products` com Controller, Service e Repository; o Repository encapsula o Drizzle.
+- [x] `GET /api/products` devolve todos os Products ordenados por nome (crescente), sem paginação.
+- [x] Erros de validação de schema viram `400` e erros inesperados viram `500`, ambos no envelope de erro e sem stack trace. O teste do `400` fica para a primeira rota com entrada (feature do Cart).
+- [x] Testes de integração no `ecommerce_test` (migrado e limpo a cada execução): campos do contrato, ordem por nome, catálogo vazio, Product com Stock zero.
+- [x] README atualizado com `GET /api/products` e `make migrate`.
