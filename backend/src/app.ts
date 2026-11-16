@@ -6,6 +6,9 @@ import Fastify, {
   type RawRequestDefaultExpression,
   type RawServerDefault,
 } from "fastify";
+import { registerCartRoutes } from "./carts/carts.controller.ts";
+import { createCartsRepository } from "./carts/carts.repository.ts";
+import { createCartsService } from "./carts/carts.service.ts";
 import type { Clock } from "./clock.ts";
 import type { Config } from "./config.ts";
 import type { Database } from "./db/connection.ts";
@@ -34,14 +37,19 @@ export type AppDependencies = {
 };
 
 /** Builds the Fastify app from its dependencies without listening. Integration tests use this seam. */
-export function buildApp({ db, config }: AppDependencies): App {
+export function buildApp({ db, config, clock }: AppDependencies): App {
   const app = Fastify({
     logger: { level: config.logLevel },
   }).withTypeProvider<TypeBoxTypeProvider>();
 
   registerErrorHandlers(app);
   registerHealthRoutes(app, createHealthService(createHealthRepository(db)));
-  registerProductRoutes(app, createProductsService(createProductsRepository(db)));
+  const productsRepository = createProductsRepository(db);
+  registerProductRoutes(app, createProductsService(productsRepository));
+  registerCartRoutes(
+    app,
+    createCartsService({ carts: createCartsRepository(db), products: productsRepository, clock }),
+  );
 
   return app;
 }

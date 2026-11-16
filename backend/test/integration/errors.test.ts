@@ -6,7 +6,7 @@ import { requireTestDatabaseUrl } from "../support/test-database-url.ts";
 
 const testDatabaseUrl = requireTestDatabaseUrl();
 
-// The 400 for schema validation is covered by the first route with input (Cart feature).
+// The 400 for schema validation is covered by the Cart routes (carts.test.ts).
 describe("error envelope", () => {
   const database = createDatabase(testDatabaseUrl);
   const app = buildApp({ db: database.db, config: { logLevel: "silent" }, clock: systemClock });

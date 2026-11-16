@@ -18,13 +18,14 @@ Não é preciso criar `.env`: todas as variáveis têm valor padrão (veja [`.en
 
 | Serviço | Endereço |
 | --- | --- |
-| Frontend (catálogo) | <http://localhost:8080> |
+| Frontend (catálogo e carrinho) | <http://localhost:8080> |
 | API | <http://localhost:8800> |
 | PostgreSQL | `localhost:5432` (usuário e senha `ecommerce`) |
 
 ### Verificação
 
 - <http://localhost:8080> mostra o catálogo: nome, descrição, preço em reais e Stock de cada Product, com o selo "Esgotado" quando o Stock é zero. Sem Products, mostra uma mensagem de catálogo vazio; se a API não responde, uma mensagem de erro.
+- Em cada Product com Stock há um campo de quantidade e o botão "Adicionar ao carrinho" (desabilitado quando Esgotado). O link "Carrinho" (`#/carrinho`) mostra os itens com preço unitário, quantidade e subtotal de cada um, e o Subtotal, em reais; o Cart continua lá depois de recarregar a página. Sem itens, mostra "Seu carrinho está vazio." com um link para o catálogo.
 - `GET http://localhost:8080/health` e `GET http://localhost:8080/api/products` passam pelo nginx do frontend e respondem igual à API.
 - `GET http://localhost:8800/health` → `200 {"status":"ok"}` quando a API acessa o banco; `503` quando o banco está inacessível.
 
@@ -34,8 +35,13 @@ Não é preciso criar `.env`: todas as variáveis têm valor padrão (veja [`.en
 | --- | --- |
 | `GET /health` | `200 {"status":"ok"}`, ou `503` quando o banco está inacessível. |
 | `GET /api/products` | `200` com todos os Products em ordem alfabética de nome (sem paginação): `[{ "id", "name", "description", "priceCents", "stock" }]`. Catálogo vazio devolve `[]`. Preço em centavos inteiros (`3990` = R$ 39,90). |
+| `POST /api/carts` | Corpo `{ "shopperId" }` (UUID gerado pelo navegador). `201` com um Cart novo, `empty`. |
+| `GET /api/carts/:id` | `200` com o Cart; `404 CART_NOT_FOUND` se não existe. |
+| `POST /api/carts/:id/items` | Corpo `{ "productId", "quantity" }`, quantidade inteira de 1 a 99. `200` com o Cart. Adicionar um Product que já está no Cart soma a quantidade e mantém o preço unitário de quando ele entrou. `422 QUANTITY_LIMIT_EXCEEDED` se a soma passa de 99; `409 INSUFFICIENT_STOCK` se passa do Stock, com `details: [{ "productId", "requested", "available" }]`; `404 PRODUCT_NOT_FOUND` ou `CART_NOT_FOUND`. |
 
-Todo erro usa o mesmo envelope: `{ "error": { "code", "message", "details"? } }`. Entrada malformada → `400` (`VALIDATION_ERROR`); rota inexistente → `404`; erro inesperado → `500` (`INTERNAL_ERROR`), sem stack trace. Os schemas das respostas ficam no pacote `shared`.
+Toda rota de Cart devolve o Cart completo: `{ "id", "status", "items": [{ "productId", "name", "unitPriceCents", "quantity", "lineTotalCents" }], "coupon", "subtotalCents", "discountCents", "totalCents" }`, com os itens na ordem em que entraram. Os valores são calculados pelo servidor, em centavos. Por enquanto `coupon` é sempre `null` e `totalCents` é igual ao `subtotalCents`.
+
+Todo erro usa o mesmo envelope: `{ "error": { "code", "message", "details"? } }`. Entrada malformada (inclusive ids que não são UUID) → `400` (`VALIDATION_ERROR`); regra de negócio violada → `404`, `409` ou `422` com um código estável (`CART_NOT_FOUND`, `INSUFFICIENT_STOCK`, ...); rota inexistente → `404`; erro inesperado → `500` (`INTERNAL_ERROR`), sem stack trace. Os schemas das respostas ficam no pacote `shared`.
 
 ## Desenvolvimento (`make dev`)
 
@@ -62,7 +68,7 @@ make test
 
 Roda a suíte completa (unidade, integração e E2E) inteiramente em containers e termina com código de saída diferente de zero se qualquer nível falhar (para no primeiro nível que falha). Só precisa de Docker. Cada nível também roda isolado com `make test-unit`, `make test-integration` e `make test-e2e`.
 
-Os testes E2E (Playwright, imagem oficial `mcr.microsoft.com/playwright`) sobem uma stack própria e descartável, o projeto compose `aigile-ecommerce-e2e` (veja [`docker-compose.e2e.yml`](docker-compose.e2e.yml)): banco novo, sem portas publicadas no host. Por isso não apagam os dados de desenvolvimento e podem rodar com `make up` de pé. Cada teste insere os Products de que precisa e acessa o frontend pelo nginx, como o comprador. Ao final, a stack e o volume dela são removidos.
+Os testes E2E (Playwright, imagem oficial `mcr.microsoft.com/playwright`) sobem uma stack própria e descartável, o projeto compose `aigile-ecommerce-e2e` (veja [`docker-compose.e2e.yml`](docker-compose.e2e.yml)): banco novo, sem portas publicadas no host. Por isso não apagam os dados de desenvolvimento e podem rodar com `make up` de pé. Cada teste insere os Products de que precisa (apagando também os Carts) e acessa o frontend pelo nginx, como o comprador. Ao final, a stack e o volume dela são removidos.
 
 ## Comandos (Makefile)
 
@@ -73,7 +79,7 @@ Os testes E2E (Playwright, imagem oficial `mcr.microsoft.com/playwright`) sobem 
 | `make logs` | Acompanha os logs de todos os serviços. |
 | `make migrate` | Aplica as migrations no banco da aplicação (serviço `migrate`, execução única). |
 | `make test` | Suíte completa (unidade, integração e E2E) em containers; falha se qualquer nível falhar. |
-| `make test-unit` | Testes de unidade do Domain do frontend (formatação de preço, regra de "Esgotado"), em container. |
+| `make test-unit` | Testes de unidade do Domain do frontend (formatação de preço, regra de "Esgotado", validação de quantidade, mensagens por código de erro), em container. |
 | `make test-integration` | Testes de integração do backend contra o database `ecommerce_test`, que é migrado e limpo a cada execução, em containers. |
 | `make test-e2e` | Testes E2E com Playwright contra uma stack compose isolada, pelo nginx; remove essa stack ao final. |
 | `make dev` | Postgres em container, migrations aplicadas, backend e Vite com recarga automática no host (veja acima). Exige Node 24 e `npm install`. |
@@ -85,4 +91,4 @@ O database `ecommerce_test` é criado na primeira inicialização do volume do P
 
 Monorepo com npm workspaces: `e2e` (testes Playwright), `backend` (Fastify, TypeScript rodando direto no Node 24, sem build), `frontend` (Vite, TypeScript e Web Components nativos, servido por nginx, que faz proxy de `/api/*` e `/health` para a API) e `shared` (contratos da API).
 
-O frontend é separado em camadas: `presentation/` (custom elements da página), `domain/` (funções puras de exibição) e `api/` (único lugar que chama `fetch`). Migrations em `backend/migrations/`, geradas a partir de `backend/src/db/schema.ts` com `npx drizzle-kit generate` (dentro de `backend/`). Decisões em [`docs/adr/`](docs/adr/) e padrões em [`CODING_STANDARDS.md`](CODING_STANDARDS.md).
+O frontend é separado em camadas: `presentation/` (custom elements das páginas, com navegação por hash entre `#/` e `#/carrinho`), `domain/` (funções puras de exibição e validação) e `api/` (único lugar que chama `fetch` e que lê e grava o Shopper id e o Cart id no `localStorage`). Migrations em `backend/migrations/`, geradas a partir de `backend/src/db/schema.ts` com `npx drizzle-kit generate` (dentro de `backend/`). Decisões em [`docs/adr/`](docs/adr/) e padrões em [`CODING_STANDARDS.md`](CODING_STANDARDS.md).

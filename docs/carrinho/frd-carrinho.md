@@ -104,7 +104,7 @@ O Shopper ganha um Cart, criado na primeira vez que adiciona um Product. No Cart
 
 ### Identidade do Shopper
 
-- O frontend gera um **Shopper id** (UUID, `crypto.randomUUID()`) uma única vez e o guarda no `localStorage`. Ele é enviado somente na criação do Cart. O Cart e o Order o registram.
+- O frontend gera um **Shopper id** (UUID v4 a partir de `crypto.getRandomValues()`, porque `crypto.randomUUID()` só existe em contexto seguro) uma única vez e o guarda no `localStorage`. Ele é enviado somente na criação do Cart. O Cart e o Order o registram.
 - Não existe tabela de Shoppers. O Shopper id não é chave primária de nada, por isso a geração pelo navegador não contradiz a ADR 0006.
 - O frontend também guarda o **Cart id** atual no `localStorage`. Ele é descartado quando o Cart fica Pedido Criado ou Abandonado, ou quando a API responde `CART_NOT_FOUND`. O Shopper id nunca é descartado.
 - Quem conhece o Cart id pode ler e alterar o Cart. Isso é aceito por não haver autenticação (fora do escopo do sistema) e fica registrado para o Passo 9.

@@ -1,7 +1,7 @@
-import type { ErrorEnvelope } from "@aigile/shared";
+import type { DomainErrorCode, ErrorEnvelope } from "@aigile/shared";
 import type { FastifyError } from "fastify";
 import type { App } from "../app.ts";
-import { DomainError, type DomainErrorCode } from "../domain-error.ts";
+import { DomainError } from "../domain-error.ts";
 
 /** HTTP status for each domain error code (FRD do Carrinho, "Erros de domínio"). */
 const domainErrorStatus: Record<DomainErrorCode, 404 | 409 | 422> = {

@@ -22,3 +22,7 @@
 - [ ] Testes de integração na seam do app HTTP para cada critério de API acima.
 - [ ] E2E do caminho feliz completo: adicionar → alterar quantidade → aplicar Coupon → finalizar → voltar para editar → finalizar → confirmar → página de confirmação com os valores certos. E2E do erro de Stock: Stock reduzido por fora antes de confirmar e a mensagem exibida. O suporte de banco do E2E passa a limpar também as tabelas de Orders.
 - [ ] README atualizado com as rotas de confirmação e de Order.
+
+## Comments
+
+- O ticket 02 já descarta o Cart id guardado quando a API responde `CART_NOT_FOUND`, e a próxima adição cria um Cart novo (`frontend/src/api/carts.ts`). Aqui falta descartar o Cart guardado que está `order_created`.

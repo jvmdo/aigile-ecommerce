@@ -3,16 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Catálogo | aigile-ecommerce</title>
+    <title>aigile-ecommerce</title>
     <link rel="stylesheet" href="/src/styles.css" />
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body>
     <header>
-      <h1>Catálogo</h1>
+      <nav class="site-nav">
+        <a href="#/">Catálogo</a>
+        <a href="#/carrinho">Carrinho</a>
+      </nav>
     </header>
     <main>
-      <catalog-page></catalog-page>
+      <app-router></app-router>
     </main>
   </body>
 </html>

@@ -1,8 +1,9 @@
+import type { DomainErrorCode } from "@aigile/shared";
 import { afterAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.ts";
 import { systemClock } from "../../src/clock.ts";
 import { createDatabase } from "../../src/db/connection.ts";
-import { DomainError, type DomainErrorCode } from "../../src/domain-error.ts";
+import { DomainError } from "../../src/domain-error.ts";
 import { requireTestDatabaseUrl } from "../support/test-database-url.ts";
 
 const testDatabaseUrl = requireTestDatabaseUrl();
