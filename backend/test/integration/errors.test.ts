@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.ts";
+import { systemClock } from "../../src/clock.ts";
 import { createDatabase } from "../../src/db/connection.ts";
 import { requireTestDatabaseUrl } from "../support/test-database-url.ts";
 
@@ -8,7 +9,7 @@ const testDatabaseUrl = requireTestDatabaseUrl();
 // The 400 for schema validation is covered by the first route with input (Cart feature).
 describe("error envelope", () => {
   const database = createDatabase(testDatabaseUrl);
-  const app = buildApp({ db: database.db, config: { logLevel: "silent" } });
+  const app = buildApp({ db: database.db, config: { logLevel: "silent" }, clock: systemClock });
 
   afterAll(async () => {
     await app.close();

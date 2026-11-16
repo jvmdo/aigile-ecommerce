@@ -1,4 +1,5 @@
 import { buildApp } from "./app.ts";
+import { systemClock } from "./clock.ts";
 import { type Config, ConfigError, loadConfig } from "./config.ts";
 import { createDatabase } from "./db/connection.ts";
 
@@ -16,7 +17,7 @@ try {
 const database = createDatabase(config.databaseUrl, {
   onIdleConnectionError: (error) => app.log.warn({ err: error }, "idle database connection lost"),
 });
-const app = buildApp({ db: database.db, config });
+const app = buildApp({ db: database.db, config, clock: systemClock });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, async () => {

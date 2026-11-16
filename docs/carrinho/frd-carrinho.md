@@ -218,7 +218,7 @@ Todas as rotas ficam sob `/api`. Toda rota de Cart devolve o Cart completo; `con
 
 ### Erros de domínio
 
-- O backend ganha um erro de domínio (código, status HTTP, mensagem em português e `details` opcional) que o Service lança e o tratador de erros converte para o envelope padrão. O Service não conhece HTTP: ele escolhe o código, e o mapeamento código → status fica na camada HTTP.
+- O backend ganha um erro de domínio (código, mensagem em português e `details` opcional) que o Service lança e o tratador de erros converte para o envelope padrão. O Service não conhece HTTP: ele escolhe o código, e o mapeamento código → status fica na camada HTTP.
 
 | Código | HTTP | Quando |
 | --- | --- | --- |

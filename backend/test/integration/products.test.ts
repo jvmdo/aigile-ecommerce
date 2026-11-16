@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.ts";
+import { systemClock } from "../../src/clock.ts";
 import { createDatabase } from "../../src/db/connection.ts";
 import { products } from "../../src/db/schema.ts";
 import { requireTestDatabaseUrl } from "../support/test-database-url.ts";
@@ -10,7 +11,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 describe("GET /api/products", () => {
   const database = createDatabase(testDatabaseUrl);
-  const app = buildApp({ db: database.db, config: { logLevel: "silent" } });
+  const app = buildApp({ db: database.db, config: { logLevel: "silent" }, clock: systemClock });
 
   beforeEach(async () => {
     await database.db.delete(products);
@@ -97,7 +98,7 @@ describe("GET /api/products", () => {
 describe("GET /api/products with the database unreachable", () => {
   // Nothing listens on port 1, so every connection attempt is refused.
   const database = createDatabase("postgres://nobody:wrong@127.0.0.1:1/missing");
-  const app = buildApp({ db: database.db, config: { logLevel: "silent" } });
+  const app = buildApp({ db: database.db, config: { logLevel: "silent" }, clock: systemClock });
 
   afterAll(async () => {
     await app.close();

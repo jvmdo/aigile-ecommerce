@@ -6,6 +6,7 @@ import Fastify, {
   type RawRequestDefaultExpression,
   type RawServerDefault,
 } from "fastify";
+import type { Clock } from "./clock.ts";
 import type { Config } from "./config.ts";
 import type { Database } from "./db/connection.ts";
 import { registerHealthRoutes } from "./health/health.controller.ts";
@@ -28,6 +29,8 @@ export type App = FastifyInstance<
 export type AppDependencies = {
   db: Database;
   config: Pick<Config, "logLevel">;
+  /** The current time for business rules (Coupon expiry, abandonment); tests pass a controllable one. */
+  clock: Clock;
 };
 
 /** Builds the Fastify app from its dependencies without listening. Integration tests use this seam. */

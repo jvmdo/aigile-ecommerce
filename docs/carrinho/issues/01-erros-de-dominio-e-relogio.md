@@ -6,11 +6,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Existe um erro de domínio com código, mensagem e `details` opcional, sem nenhuma referência a HTTP.
-- [ ] O tratador de erros converte o erro de domínio no envelope `{ error: { code, message, details? } }` com o status mapeado pelo código; um código sem mapeamento vira `500` sem vazar a mensagem interna.
-- [ ] O mapeamento já contém todos os códigos da tabela de erros de domínio do FRD.
-- [ ] A função de montagem da aplicação recebe o relógio como dependência; o ponto de entrada passa o relógio do sistema.
-- [ ] Teste de integração na seam do app HTTP prova que um erro de domínio vira o envelope com o status certo e os `details` (por meio de uma rota registrada só no teste).
-- [ ] Os testes existentes de products, errors e health continuam passando sem alteração de comportamento.
+- [x] Existe um erro de domínio com código, mensagem e `details` opcional, sem nenhuma referência a HTTP.
+- [x] O tratador de erros converte o erro de domínio no envelope `{ error: { code, message, details? } }` com o status mapeado pelo código; um código sem mapeamento vira `500` sem vazar a mensagem interna.
+- [x] O mapeamento já contém todos os códigos da tabela de erros de domínio do FRD.
+- [x] A função de montagem da aplicação recebe o relógio como dependência; o ponto de entrada passa o relógio do sistema.
+- [x] Teste de integração na seam do app HTTP prova que um erro de domínio vira o envelope com o status certo e os `details` (por meio de uma rota registrada só no teste).
+- [x] Os testes existentes de products, errors e health continuam passando sem alteração de comportamento.

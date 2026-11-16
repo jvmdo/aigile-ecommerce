@@ -1,6 +1,7 @@
 import pg from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { buildApp } from "../../src/app.ts";
+import { systemClock } from "../../src/clock.ts";
 import { createDatabase } from "../../src/db/connection.ts";
 import { requireTestDatabaseUrl } from "../support/test-database-url.ts";
 
@@ -24,7 +25,7 @@ async function dropOtherConnectionsTo(connectionString: string): Promise<void> {
 describe("GET /health", () => {
   describe("with the database reachable", () => {
     const database = createDatabase(testDatabaseUrl);
-    const app = buildApp({ db: database.db, config: { logLevel: "silent" } });
+    const app = buildApp({ db: database.db, config: { logLevel: "silent" }, clock: systemClock });
 
     afterAll(async () => {
       await app.close();
@@ -51,7 +52,7 @@ describe("GET /health", () => {
   describe("with the database unreachable", () => {
     // Nothing listens on port 1, so every connection attempt is refused.
     const database = createDatabase("postgres://nobody:wrong@127.0.0.1:1/missing");
-    const app = buildApp({ db: database.db, config: { logLevel: "silent" } });
+    const app = buildApp({ db: database.db, config: { logLevel: "silent" }, clock: systemClock });
 
     afterAll(async () => {
       await app.close();
