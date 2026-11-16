@@ -2,7 +2,7 @@
   "name": "aigile-ecommerce",
   "private": true,
   "type": "module",
-  "workspaces": ["shared", "backend", "frontend"],
+  "workspaces": ["shared", "backend", "frontend", "e2e"],
   "engines": {
     "node": ">=24"
   },

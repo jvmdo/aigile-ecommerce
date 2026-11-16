@@ -6,6 +6,7 @@ COPY package.json package-lock.json ./
 COPY shared/package.json shared/
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
+COPY e2e/package.json e2e/
 RUN npm ci --workspace @aigile/frontend --include-workspace-root=false
 COPY tsconfig.base.json ./
 COPY shared/ shared/

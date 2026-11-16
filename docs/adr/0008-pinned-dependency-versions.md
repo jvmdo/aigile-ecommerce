@@ -4,7 +4,7 @@ This project is built by coding agents, so we pin each dependency to a major/min
 
 | Package | Version | Notes |
 | --- | --- | --- |
-| Node.js (host and images) | 24 | Native type stripping (ADR 0007) |
+| Node.js (host and images) | 24 | Native type stripping (ADR 0007). Exception: the Playwright image ships its own Node (22 in 1.52.0); only the test runner runs there, and Playwright compiles the TypeScript itself |
 | `typescript` | ~5.8 | First version with `erasableSyntaxOnly` |
 | `@types/node` | ^24 | |
 | `fastify` | ^5 | |

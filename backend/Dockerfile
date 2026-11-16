@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 COPY shared/package.json shared/
 COPY backend/package.json backend/
 COPY frontend/package.json frontend/
+COPY e2e/package.json e2e/
 
 # Backend with dev dependencies (drizzle-kit, Vitest).
 FROM base AS dev-deps

@@ -1,0 +1,34 @@
+# The E2E stack: layered on docker-compose.yml under its own project name by `make test-e2e`:
+#
+#   docker compose -p aigile-ecommerce-e2e -f docker-compose.yml -f docker-compose.e2e.yml \
+#     --profile test run --rm --build test-e2e
+#
+# A separate project gets its own containers, network and database volume, so the tests can
+# replace every Product without touching the development data, and it runs while `make up`
+# is running because no host port is published.
+
+services:
+  db:
+    ports: !reset []
+
+  api:
+    ports: !reset []
+
+  web:
+    ports: !reset []
+
+  test-e2e:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: e2e/Dockerfile
+    environment:
+      # The buyer's view: the frontend through nginx, which proxies /api/* and /health.
+      E2E_BASE_URL: http://web:8080
+      # The same database the api reads, so each test inserts the Products it needs.
+      E2E_DATABASE_URL: postgres://${POSTGRES_USER:-ecommerce}:${POSTGRES_PASSWORD:-ecommerce}@db:5432/${POSTGRES_DB:-ecommerce}
+    # Recommended by Playwright for Chromium, which otherwise can run out of shared memory.
+    ipc: host
+    depends_on:
+      web:
+        condition: service_healthy
