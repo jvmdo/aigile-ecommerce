@@ -36,4 +36,10 @@ describe("validateQuantity", () => {
       message: "Só há 1 unidade em estoque.",
     });
   });
+
+  it("checks only the 1 to 99 range when the Stock is not known (the Cart page)", () => {
+    expect(validateQuantity(99)).toEqual({ valid: true });
+    expect(validateQuantity(0)).toEqual({ valid: false, message: INVALID_QUANTITY });
+    expect(validateQuantity(100)).toEqual({ valid: false, message: INVALID_QUANTITY });
+  });
 });

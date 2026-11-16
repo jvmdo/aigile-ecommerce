@@ -25,7 +25,7 @@ Não é preciso criar `.env`: todas as variáveis têm valor padrão (veja [`.en
 ### Verificação
 
 - <http://localhost:8080> mostra o catálogo: nome, descrição, preço em reais e Stock de cada Product, com o selo "Esgotado" quando o Stock é zero. Sem Products, mostra uma mensagem de catálogo vazio; se a API não responde, uma mensagem de erro.
-- Em cada Product com Stock há um campo de quantidade e o botão "Adicionar ao carrinho" (desabilitado quando Esgotado). O link "Carrinho" (`#/carrinho`) mostra os itens com preço unitário, quantidade e subtotal de cada um, e o Subtotal, em reais; o Cart continua lá depois de recarregar a página. Sem itens, mostra "Seu carrinho está vazio." com um link para o catálogo.
+- Em cada Product com Stock há um campo de quantidade e o botão "Adicionar ao carrinho" (desabilitado quando Esgotado). O link "Carrinho" (`#/carrinho`) mostra os itens com preço unitário, quantidade editável ("Atualizar"), subtotal de cada um e botão "Remover", e o Subtotal, em reais; o Cart continua lá depois de recarregar a página. Sem itens, mostra "Seu carrinho está vazio." com um link para o catálogo.
 - `GET http://localhost:8080/health` e `GET http://localhost:8080/api/products` passam pelo nginx do frontend e respondem igual à API.
 - `GET http://localhost:8800/health` → `200 {"status":"ok"}` quando a API acessa o banco; `503` quando o banco está inacessível.
 
@@ -38,6 +38,8 @@ Não é preciso criar `.env`: todas as variáveis têm valor padrão (veja [`.en
 | `POST /api/carts` | Corpo `{ "shopperId" }` (UUID gerado pelo navegador). `201` com um Cart novo, `empty`. |
 | `GET /api/carts/:id` | `200` com o Cart; `404 CART_NOT_FOUND` se não existe. |
 | `POST /api/carts/:id/items` | Corpo `{ "productId", "quantity" }`, quantidade inteira de 1 a 99. `200` com o Cart. Adicionar um Product que já está no Cart soma a quantidade e mantém o preço unitário de quando ele entrou. `422 QUANTITY_LIMIT_EXCEEDED` se a soma passa de 99; `409 INSUFFICIENT_STOCK` se passa do Stock, com `details: [{ "productId", "requested", "available" }]`; `404 PRODUCT_NOT_FOUND` ou `CART_NOT_FOUND`. |
+| `PATCH /api/carts/:id/items/:productId` | Corpo `{ "quantity" }`, inteira de 1 a 99. Substitui a quantidade do item e devolve `200` com o Cart; o preço unitário não muda. `409 INSUFFICIENT_STOCK` (com `details`) se passa do Stock atual; `404 CART_ITEM_NOT_FOUND` se o Product não está no Cart. |
+| `DELETE /api/carts/:id/items/:productId` | Remove o item e devolve `200` com o Cart; remover o último leva o Cart a `empty`. `404 CART_ITEM_NOT_FOUND` se o Product não está no Cart. |
 
 Toda rota de Cart devolve o Cart completo: `{ "id", "status", "items": [{ "productId", "name", "unitPriceCents", "quantity", "lineTotalCents" }], "coupon", "subtotalCents", "discountCents", "totalCents" }`, com os itens na ordem em que entraram. Os valores são calculados pelo servidor, em centavos. Por enquanto `coupon` é sempre `null` e `totalCents` é igual ao `subtotalCents`.
 

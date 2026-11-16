@@ -16,6 +16,12 @@ test.beforeEach(async () => {
       priceCents: 125000,
       stock: 0,
     },
+    {
+      name: "Vaso de Barro",
+      description: "Vaso artesanal, 20 cm.",
+      priceCents: 5000,
+      stock: 3,
+    },
   ]);
 });
 
@@ -27,6 +33,17 @@ async function addFromCatalog(page: Page, name: string, quantity: string): Promi
   const card = productCard(page, name);
   await card.getByLabel("Quantidade").fill(quantity);
   await card.getByRole("button", { name: "Adicionar ao carrinho" }).click();
+}
+
+/** Checks one Cart row: name, unit price, quantity (an editable field) and item subtotal. */
+async function expectCartItem(
+  page: Page,
+  item: { name: string; unitPrice: string; quantity: string; lineTotal: string },
+): Promise<void> {
+  const row = page.locator(".cart-item").filter({ hasText: item.name });
+  await expect(row.locator(".cart-item-unit-price")).toHaveText(item.unitPrice);
+  await expect(row.getByLabel(`Quantidade de ${item.name}`)).toHaveValue(item.quantity);
+  await expect(row.locator(".cart-item-line-total")).toHaveText(item.lineTotal);
 }
 
 async function openCart(page: Page): Promise<void> {
@@ -48,8 +65,12 @@ test("adding from the catalog shows the Product in the Cart, sums a repeated add
   );
 
   await openCart(page);
-  const mugRow = page.locator(".cart-item").filter({ hasText: "Caneca Esmaltada" });
-  await expect(mugRow.locator("td")).toHaveText(["Caneca Esmaltada", "R$ 39,90", "2", "R$ 79,80"]);
+  await expectCartItem(page, {
+    name: "Caneca Esmaltada",
+    unitPrice: "R$ 39,90",
+    quantity: "2",
+    lineTotal: "R$ 79,80",
+  });
   await expect(page.locator(".cart-subtotal")).toHaveText("Subtotal: R$ 79,80");
 
   await page.getByRole("link", { name: "Catálogo" }).click();
@@ -59,11 +80,21 @@ test("adding from the catalog shows the Product in the Cart, sums a repeated add
   );
   await openCart(page);
   await expect(page.locator(".cart-item")).toHaveCount(1);
-  await expect(mugRow.locator("td")).toHaveText(["Caneca Esmaltada", "R$ 39,90", "3", "R$ 119,70"]);
+  await expectCartItem(page, {
+    name: "Caneca Esmaltada",
+    unitPrice: "R$ 39,90",
+    quantity: "3",
+    lineTotal: "R$ 119,70",
+  });
   await expect(page.locator(".cart-subtotal")).toHaveText("Subtotal: R$ 119,70");
 
   await page.reload();
-  await expect(mugRow.locator("td")).toHaveText(["Caneca Esmaltada", "R$ 39,90", "3", "R$ 119,70"]);
+  await expectCartItem(page, {
+    name: "Caneca Esmaltada",
+    unitPrice: "R$ 39,90",
+    quantity: "3",
+    lineTotal: "R$ 119,70",
+  });
   await expect(page.locator(".cart-subtotal")).toHaveText("Subtotal: R$ 119,70");
 });
 
@@ -98,4 +129,69 @@ test("a Stock shortage the server finds is shown with its Portuguese message", a
   await expect(productCard(page, "Caneca Esmaltada").getByRole("alert")).toHaveText(
     "Não há estoque suficiente para essa quantidade.",
   );
+});
+
+test("changing a quantity in the Cart updates the item subtotal and the Subtotal", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addFromCatalog(page, "Caneca Esmaltada", "1");
+  await expect(productCard(page, "Caneca Esmaltada").getByRole("status")).toBeVisible();
+  await openCart(page);
+
+  await page.getByLabel("Quantidade de Caneca Esmaltada").fill("4");
+  await page.getByRole("button", { name: "Atualizar" }).click();
+
+  await expectCartItem(page, {
+    name: "Caneca Esmaltada",
+    unitPrice: "R$ 39,90",
+    quantity: "4",
+    lineTotal: "R$ 159,60",
+  });
+  await expect(page.locator(".cart-subtotal")).toHaveText("Subtotal: R$ 159,60");
+});
+
+test("a quantity above the Stock is refused in the Cart with the Portuguese message", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addFromCatalog(page, "Vaso de Barro", "1");
+  await expect(productCard(page, "Vaso de Barro").getByRole("status")).toBeVisible();
+  await openCart(page);
+
+  await page.getByLabel("Quantidade de Vaso de Barro").fill("4");
+  await page.getByRole("button", { name: "Atualizar" }).click();
+
+  await expect(page.getByRole("alert")).toHaveText(
+    "Não há estoque suficiente para essa quantidade.",
+  );
+});
+
+test("removing items keeps the others, and removing the last one shows the empty Cart", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addFromCatalog(page, "Caneca Esmaltada", "2");
+  await expect(productCard(page, "Caneca Esmaltada").getByRole("status")).toBeVisible();
+  await addFromCatalog(page, "Vaso de Barro", "1");
+  await expect(productCard(page, "Vaso de Barro").getByRole("status")).toBeVisible();
+  await openCart(page);
+  await expect(page.locator(".cart-subtotal")).toHaveText("Subtotal: R$ 129,80");
+
+  await page.getByRole("button", { name: "Remover Caneca Esmaltada" }).click();
+
+  await expect(page.locator(".cart-item")).toHaveCount(1);
+  await expectCartItem(page, {
+    name: "Vaso de Barro",
+    unitPrice: "R$ 50,00",
+    quantity: "1",
+    lineTotal: "R$ 50,00",
+  });
+  await expect(page.locator(".cart-subtotal")).toHaveText("Subtotal: R$ 50,00");
+
+  await page.getByRole("button", { name: "Remover Vaso de Barro" }).click();
+
+  await expect(page.getByText("Seu carrinho está vazio.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Seu carrinho está vazio.")).toBeVisible();
 });

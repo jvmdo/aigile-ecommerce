@@ -10,6 +10,7 @@ const testDatabaseUrl = requireTestDatabaseUrl();
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const SHOPPER_ID = "0f8b6c1e-2d3a-4b5c-8d9e-0a1b2c3d4e5f";
+const UNKNOWN_CART_ID = "7d2f0c4a-9b1e-4c3d-8a5f-6e7b8c9d0a1b";
 
 describe("Carts API", () => {
   const database = createDatabase(testDatabaseUrl);
@@ -327,6 +328,191 @@ describe("Carts API", () => {
     });
   });
 
+  describe("PATCH /api/carts/:id/items/:productId", () => {
+    it("replaces the quantity and keeps the unit price", async () => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+      await addItem(cartId, { productId: mugId, quantity: 5 });
+      await setProductPrice(mugId, 4500);
+
+      const response = await updateItem(cartId, mugId, { quantity: 2 });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        id: cartId,
+        status: "with_items",
+        items: [
+          {
+            productId: mugId,
+            name: "Caneca Esmaltada",
+            unitPriceCents: 3990,
+            quantity: 2,
+            lineTotalCents: 7980,
+          },
+        ],
+        coupon: null,
+        subtotalCents: 7980,
+        discountCents: 0,
+        totalCents: 7980,
+      });
+    });
+
+    it("accepts 99 and exactly the Stock", async () => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 100, stock: 99 });
+      await addItem(cartId, { productId: mugId, quantity: 1 });
+
+      const response = await updateItem(cartId, mugId, { quantity: 99 });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ items: [{ productId: mugId, quantity: 99 }] });
+    });
+
+    it.each([
+      { case: "quantity 0", quantity: 0 },
+      { case: "quantity 100", quantity: 100 },
+      { case: "a fractional quantity", quantity: 2.5 },
+    ])("responds 400 VALIDATION_ERROR for $case", async ({ quantity }) => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 200 });
+      await addItem(cartId, { productId: mugId, quantity: 1 });
+
+      const response = await updateItem(cartId, mugId, { quantity });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "A requisição é inválida.",
+          details: [{ path: "body/quantity", message: expect.any(String) }],
+        },
+      });
+    });
+
+    it("responds 400 VALIDATION_ERROR when the Product id in the path is not a UUID", async () => {
+      const cartId = await createCart();
+
+      const response = await updateItem(cartId, "9", { quantity: 1 });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({
+        error: { code: "VALIDATION_ERROR", details: [{ path: "params/productId" }] },
+      });
+    });
+
+    it("responds 409 INSUFFICIENT_STOCK when the new quantity exceeds the current Stock", async () => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+      await addItem(cartId, { productId: mugId, quantity: 2 });
+      await setProductStock(mugId, 4);
+
+      const response = await updateItem(cartId, mugId, { quantity: 5 });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        error: {
+          code: "INSUFFICIENT_STOCK",
+          message: expect.any(String),
+          details: [{ productId: mugId, requested: 5, available: 4 }],
+        },
+      });
+      const cart = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+      expect(cart.json()).toMatchObject({ items: [{ productId: mugId, quantity: 2 }] });
+    });
+
+    it("responds 404 CART_ITEM_NOT_FOUND for a Product that is not in the Cart", async () => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+
+      const response = await updateItem(cartId, mugId, { quantity: 1 });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({
+        error: { code: "CART_ITEM_NOT_FOUND", message: expect.any(String) },
+      });
+    });
+
+    it("responds 404 CART_NOT_FOUND for a Cart that does not exist", async () => {
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+
+      const response = await updateItem(UNKNOWN_CART_ID, mugId, { quantity: 1 });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({ error: { code: "CART_NOT_FOUND" } });
+    });
+  });
+
+  describe("DELETE /api/carts/:id/items/:productId", () => {
+    it("removes an item that is not the last one and keeps the Cart with_items", async () => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+      const lampId = await insertProduct({ name: "Luminária", priceCents: 12500, stock: 3 });
+      await addItem(cartId, { productId: mugId, quantity: 2 });
+      await addItem(cartId, { productId: lampId, quantity: 1 });
+
+      const response = await removeItem(cartId, mugId);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        id: cartId,
+        status: "with_items",
+        items: [
+          {
+            productId: lampId,
+            name: "Luminária",
+            unitPriceCents: 12500,
+            quantity: 1,
+            lineTotalCents: 12500,
+          },
+        ],
+        coupon: null,
+        subtotalCents: 12500,
+        discountCents: 0,
+        totalCents: 12500,
+      });
+    });
+
+    it("moves the Cart to empty with Subtotal 0 when the last item is removed", async () => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+      await addItem(cartId, { productId: mugId, quantity: 2 });
+
+      const response = await removeItem(cartId, mugId);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({
+        id: cartId,
+        status: "empty",
+        items: [],
+        coupon: null,
+        subtotalCents: 0,
+        discountCents: 0,
+        totalCents: 0,
+      });
+    });
+
+    it("responds 404 CART_ITEM_NOT_FOUND for a Product that is not in the Cart", async () => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+
+      const response = await removeItem(cartId, mugId);
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({
+        error: { code: "CART_ITEM_NOT_FOUND", message: expect.any(String) },
+      });
+    });
+
+    it("responds 404 CART_NOT_FOUND for a Cart that does not exist", async () => {
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+
+      const response = await removeItem(UNKNOWN_CART_ID, mugId);
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({ error: { code: "CART_NOT_FOUND" } });
+    });
+  });
+
   // The API does not return this instant; it becomes observable through abandonment after
   // 24 h (ticket 08). Until then the test reads it from the database.
   describe("last change of the Cart", () => {
@@ -351,6 +537,20 @@ describe("Carts API", () => {
       clock.set(new Date("2026-11-17T10:00:00Z"));
       await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
       expect(await lastChangedAt(cartId)).toEqual(new Date("2026-11-16T09:30:00Z"));
+    });
+
+    it("is set on each quantity change and removal", async () => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+      await addItem(cartId, { productId: mugId, quantity: 1 });
+
+      clock.set(new Date("2026-11-16T14:00:00Z"));
+      await updateItem(cartId, mugId, { quantity: 3 });
+      expect(await lastChangedAt(cartId)).toEqual(new Date("2026-11-16T14:00:00Z"));
+
+      clock.set(new Date("2026-11-16T15:00:00Z"));
+      await removeItem(cartId, mugId);
+      expect(await lastChangedAt(cartId)).toEqual(new Date("2026-11-16T15:00:00Z"));
     });
 
     it("is not changed by a rejected addition", async () => {
@@ -379,6 +579,22 @@ describe("Carts API", () => {
 
   async function setProductPrice(productId: string, priceCents: number): Promise<void> {
     await database.db.update(products).set({ priceCents }).where(eq(products.id, productId));
+  }
+
+  async function setProductStock(productId: string, stock: number): Promise<void> {
+    await database.db.update(products).set({ stock }).where(eq(products.id, productId));
+  }
+
+  function updateItem(cartId: string, productId: string, payload: { quantity: unknown }) {
+    return app.inject({
+      method: "PATCH",
+      url: `/api/carts/${cartId}/items/${productId}`,
+      payload,
+    });
+  }
+
+  function removeItem(cartId: string, productId: string) {
+    return app.inject({ method: "DELETE", url: `/api/carts/${cartId}/items/${productId}` });
   }
 
   function addItem(cartId: string, payload: { productId: string; quantity: unknown }) {

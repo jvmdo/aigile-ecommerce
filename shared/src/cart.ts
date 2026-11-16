@@ -57,6 +57,14 @@ export const CartParams = Type.Object({
 
 export type CartParams = Static<typeof CartParams>;
 
+/** Path parameters of every `/api/carts/:id/items/:productId` route. */
+export const CartItemParams = Type.Object({
+  id: Type.String({ format: "uuid" }),
+  productId: Type.String({ format: "uuid" }),
+});
+
+export type CartItemParams = Static<typeof CartItemParams>;
+
 /** `POST /api/carts`: creates an empty Cart for the Shopper. */
 export const CreateCartBody = Type.Object({
   shopperId: Type.String({ format: "uuid" }),
@@ -71,3 +79,10 @@ export const AddCartItemBody = Type.Object({
 });
 
 export type AddCartItemBody = Static<typeof AddCartItemBody>;
+
+/** `PATCH /api/carts/:id/items/:productId`: replaces the quantity of a Cart Item. */
+export const UpdateCartItemBody = Type.Object({
+  quantity: Type.Integer({ minimum: 1, maximum: MAX_ITEM_QUANTITY }),
+});
+
+export type UpdateCartItemBody = Static<typeof UpdateCartItemBody>;

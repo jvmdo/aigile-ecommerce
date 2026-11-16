@@ -1,11 +1,10 @@
-import { MAX_ITEM_QUANTITY, type Product } from "@aigile/shared";
+import type { Product } from "@aigile/shared";
 import { addToCart } from "../api/carts.ts";
-import { ApiError } from "../api/http.ts";
-import { errorMessage } from "../domain/error-messages.ts";
 import { formatPrice } from "../domain/money.ts";
 import { validateQuantity } from "../domain/quantity.ts";
 import { SOLD_OUT_LABEL, formatStock, isSoldOut } from "../domain/stock.ts";
 import { createTextElement } from "./dom.ts";
+import { apiErrorMessage, createQuantityInput } from "./quantity-input.ts";
 
 /**
  * `<product-card>`: one Product with its name, description, price and Stock, the sold-out
@@ -34,18 +33,11 @@ export class ProductCard extends HTMLElement {
 function createAddToCartForm(product: Product, soldOut: boolean): HTMLFormElement {
   const form = document.createElement("form");
   form.className = "add-to-cart";
-  // The Domain validates the quantity, so the browser's own validation bubbles stay off.
   form.noValidate = true;
 
   const label = document.createElement("label");
   label.textContent = "Quantidade ";
-  const input = document.createElement("input");
-  input.type = "number";
-  input.name = "quantity";
-  input.min = "1";
-  input.max = String(MAX_ITEM_QUANTITY);
-  input.step = "1";
-  input.value = "1";
+  const input = createQuantityInput(1);
   input.disabled = soldOut;
   label.append(input);
 
@@ -81,7 +73,7 @@ function createAddToCartForm(product: Product, soldOut: boolean): HTMLFormElemen
       await addToCart({ productId: product.id, quantity });
       showMessage("Adicionado ao carrinho.", false);
     } catch (error) {
-      showMessage(errorMessage(error instanceof ApiError ? error.code : undefined), true);
+      showMessage(apiErrorMessage(error), true);
     } finally {
       button.disabled = false;
     }

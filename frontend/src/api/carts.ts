@@ -1,4 +1,4 @@
-import type { AddCartItemBody, Cart, CreateCartBody } from "@aigile/shared";
+import type { AddCartItemBody, Cart, CreateCartBody, UpdateCartItemBody } from "@aigile/shared";
 import { readStored, removeStored, writeStored } from "./browser-storage.ts";
 import { ApiError, requestJson } from "./http.ts";
 
@@ -72,4 +72,15 @@ export async function addToCart(item: AddCartItemBody): Promise<Cart> {
   }
   const cartId = await createCart();
   return requestJson<Cart>("POST", `/api/carts/${cartId}/items`, item);
+}
+
+/** Replaces the quantity of a Cart Item and returns the updated Cart. */
+export function updateCartItem(cartId: string, productId: string, quantity: number): Promise<Cart> {
+  const body: UpdateCartItemBody = { quantity };
+  return requestJson<Cart>("PATCH", `/api/carts/${cartId}/items/${productId}`, body);
+}
+
+/** Removes a Cart Item and returns the updated Cart (`empty` after the last one). */
+export function removeCartItem(cartId: string, productId: string): Promise<Cart> {
+  return requestJson<Cart>("DELETE", `/api/carts/${cartId}/items/${productId}`);
 }

@@ -77,6 +77,14 @@ product-card.sold-out {
   text-align: left;
 }
 
+.cart-item-quantity-form input {
+  width: 4rem;
+}
+
+.cart-item-quantity-form button {
+  margin-left: 0.5rem;
+}
+
 .cart-subtotal {
   font-weight: bold;
 }
