@@ -1,6 +1,9 @@
 import type { Product } from "@aigile/shared";
 
-/** A Product is shown as "Esgotado" when it has no Stock left. */
+/** The badge label shown on a sold-out Product. */
+export const SOLD_OUT_LABEL = "Esgotado";
+
+/** A Product is shown as sold out ({@link SOLD_OUT_LABEL}) when it has no Stock left. */
 export function isSoldOut(product: Pick<Product, "stock">): boolean {
   return product.stock === 0;
 }

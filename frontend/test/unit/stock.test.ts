@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatStock, isSoldOut } from "../../src/domain/stock.ts";
+import { SOLD_OUT_LABEL, formatStock, isSoldOut } from "../../src/domain/stock.ts";
+
+describe("SOLD_OUT_LABEL", () => {
+  it('labels a sold-out Product as "Esgotado"', () => {
+    expect(SOLD_OUT_LABEL).toBe("Esgotado");
+  });
+});
 
 describe("isSoldOut", () => {
   it("is sold out when Stock is zero", () => {
