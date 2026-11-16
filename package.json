@@ -7,12 +7,14 @@
     "node": ">=24"
   },
   "scripts": {
+    "dev": "concurrently --names api,web --prefix-colors blue,green --kill-others \"npm run dev -w @aigile/backend\" \"npm run dev -w @aigile/frontend\"",
     "check": "npm run typecheck --workspaces && biome check .",
     "format": "biome check --write ."
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@types/node": "^24",
+    "concurrently": "^9",
     "typescript": "~5.8"
   }
 }

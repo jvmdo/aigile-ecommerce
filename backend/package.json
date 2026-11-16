@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.ts",
+    "dev": "node --watch --env-file=dev.env src/server.ts",
     "typecheck": "tsc --noEmit",
     "test:integration": "vitest run test/integration"
   },

@@ -37,6 +37,23 @@ Não é preciso criar `.env`: todas as variáveis têm valor padrão (veja [`.en
 
 Todo erro usa o mesmo envelope: `{ "error": { "code", "message", "details"? } }`. Entrada malformada → `400` (`VALIDATION_ERROR`); rota inexistente → `404`; erro inesperado → `500` (`INTERNAL_ERROR`), sem stack trace. Os schemas das respostas ficam no pacote `shared`.
 
+## Desenvolvimento (`make dev`)
+
+Exige Node 24 no host e `npm install` na raiz, uma vez.
+
+```sh
+make dev
+```
+
+Sobe só o Postgres em container, espera o healthcheck, aplica as migrations e roda em paralelo, num só terminal e com logs prefixados (`[api]` e `[web]`):
+
+- o backend com `node --watch` em <http://localhost:8800>, que reinicia a cada arquivo do código do backend ou do `shared` alterado;
+- o Vite dev server em <http://localhost:5173>, que recarrega a página a cada arquivo alterado no frontend e faz proxy de `/api` e `/health` para a porta 8800, com os mesmos caminhos de produção.
+
+Ctrl+C encerra os dois e deixa o Postgres rodando; `make down` derruba tudo. Com o banco já de pé, `npm run dev` na raiz faz o mesmo que `make dev` sem subir o banco nem migrar.
+
+No host, `make dev` monta o `DATABASE_URL` do backend com os mesmos `POSTGRES_*` do compose (do `.env`, se houver), então mudar a porta ou as credenciais do banco no `.env` vale para os dois. `npm run dev` sozinho usa [`backend/dev.env`](backend/dev.env), com os valores padrão; uma variável definida no shell vale sobre ele (`LOG_LEVEL=debug npm run dev`). Se a stack completa estiver de pé (`make up`), a porta 8800 já está ocupada pela `api` do compose: rode `make down` antes.
+
 ## Testes
 
 ```sh
@@ -59,6 +76,7 @@ Os testes E2E (Playwright, imagem oficial `mcr.microsoft.com/playwright`) sobem 
 | `make test-unit` | Testes de unidade do Domain do frontend (formatação de preço, regra de "Esgotado"), em container. |
 | `make test-integration` | Testes de integração do backend contra o database `ecommerce_test`, que é migrado e limpo a cada execução, em containers. |
 | `make test-e2e` | Testes E2E com Playwright contra uma stack compose isolada, pelo nginx; remove essa stack ao final. |
+| `make dev` | Postgres em container, migrations aplicadas, backend e Vite com recarga automática no host (veja acima). Exige Node 24 e `npm install`. |
 | `make check` | `tsc --noEmit` em todos os workspaces e Biome. Exige Node 24 no host e `npm install`. |
 
 O database `ecommerce_test` é criado na primeira inicialização do volume do Postgres. Se o volume já existia antes disso, recrie-o com `docker compose down -v` (apaga os dados locais).
