@@ -18,11 +18,14 @@ Não é preciso criar `.env`: todas as variáveis têm valor padrão (veja [`.en
 
 | Serviço | Endereço |
 | --- | --- |
+| Frontend (catálogo) | <http://localhost:8080> |
 | API | <http://localhost:8800> |
 | PostgreSQL | `localhost:5432` (usuário e senha `ecommerce`) |
 
 ### Verificação
 
+- <http://localhost:8080> mostra o catálogo: nome, descrição, preço em reais e Stock de cada Product, com o selo "Esgotado" quando o Stock é zero. Sem Products, mostra uma mensagem de catálogo vazio; se a API não responde, uma mensagem de erro.
+- `GET http://localhost:8080/health` e `GET http://localhost:8080/api/products` passam pelo nginx do frontend e respondem igual à API.
 - `GET http://localhost:8800/health` → `200 {"status":"ok"}` quando a API acessa o banco; `503` quando o banco está inacessível.
 
 ## API
@@ -42,6 +45,7 @@ Todo erro usa o mesmo envelope: `{ "error": { "code", "message", "details"? } }`
 | `make down` | Derruba a stack (o volume do banco é mantido). |
 | `make logs` | Acompanha os logs de todos os serviços. |
 | `make migrate` | Aplica as migrations no banco da aplicação (serviço `migrate`, execução única). |
+| `make test-unit` | Testes de unidade do Domain do frontend (formatação de preço, regra de "Esgotado"), em container. |
 | `make test-integration` | Testes de integração do backend contra o database `ecommerce_test`, que é migrado e limpo a cada execução, em containers. |
 | `make check` | `tsc --noEmit` em todos os workspaces e Biome. Exige Node 24 no host e `npm install`. |
 
@@ -49,4 +53,6 @@ O database `ecommerce_test` é criado na primeira inicialização do volume do P
 
 ## Estrutura
 
-Monorepo com npm workspaces: `backend` (Fastify, TypeScript rodando direto no Node 24, sem build), `frontend` e `shared` (contratos da API). Migrations em `backend/migrations/`, geradas a partir de `backend/src/db/schema.ts` com `npx drizzle-kit generate` (dentro de `backend/`). Decisões em [`docs/adr/`](docs/adr/) e padrões em [`CODING_STANDARDS.md`](CODING_STANDARDS.md).
+Monorepo com npm workspaces: `backend` (Fastify, TypeScript rodando direto no Node 24, sem build), `frontend` (Vite, TypeScript e Web Components nativos, servido por nginx, que faz proxy de `/api/*` e `/health` para a API) e `shared` (contratos da API).
+
+O frontend é separado em camadas: `presentation/` (custom elements da página), `domain/` (funções puras de exibição) e `api/` (único lugar que chama `fetch`). Migrations em `backend/migrations/`, geradas a partir de `backend/src/db/schema.ts` com `npx drizzle-kit generate` (dentro de `backend/`). Decisões em [`docs/adr/`](docs/adr/) e padrões em [`CODING_STANDARDS.md`](CODING_STANDARDS.md).

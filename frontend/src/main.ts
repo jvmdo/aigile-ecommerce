@@ -1,2 +1,2 @@
-// Catalog page arrives in ticket 03.
-export {};
+// Registers the custom elements used by index.html.
+import "./presentation/catalog-page.ts";

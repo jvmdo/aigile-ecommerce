@@ -4,6 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run test/unit"
+  },
+  "devDependencies": {
+    "@aigile/shared": "0.0.0",
+    "vite": "^6.4.6",
+    "vitest": "^3.2.7"
   }
 }
