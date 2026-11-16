@@ -73,9 +73,9 @@ Um esqueleto que atravessa todas as camadas e entrega um fluxo real e pequeno: o
 
 ### Estrutura do repositório
 
-- Monorepo com npm workspaces e três pacotes: **backend**, **frontend** e **shared** (contratos da API). Sem Turborepo nem pnpm (ADR 0007).
-- Na raiz: `docker-compose.yml`, `Makefile`, `README.md`, `.env.example`, `.gitignore`, configuração do Biome, tsconfig base e o `package.json` dos workspaces.
-- Node 24 em todo lugar (host de dev e imagens).
+- Monorepo com npm workspaces e três pacotes de aplicação: **backend**, **frontend** e **shared** (contratos da API). Um quarto workspace, **e2e**, guarda só os testes Playwright. Sem Turborepo nem pnpm (ADR 0007).
+- Na raiz: `docker-compose.yml`, `docker-compose.e2e.yml` (override da stack de E2E, ADR 0004), `Makefile`, `README.md`, `.env.example`, `.gitignore`, configuração do Biome, tsconfig base e o `package.json` dos workspaces.
+- Node 24 em todo lugar (host de dev e imagens). Única exceção: a imagem oficial do Playwright traz o próprio Node (22 na 1.52.0), onde só roda o runner de testes (ADR 0008).
 
 ### Pacote shared (contratos)
 
@@ -103,7 +103,7 @@ Um esqueleto que atravessa todas as camadas e entrega um fluxo real e pequeno: o
 ### Banco de dados
 
 - PostgreSQL (ADR 0001), acessado com Drizzle (ADR 0002). Migrations geradas e aplicadas com `drizzle-kit`.
-- Tabela de Products: `id` UUID gerado pelo banco (`gen_random_uuid()`, ADR 0006), `name` texto obrigatório, `description` texto, `price_cents` inteiro maior ou igual a 0, `stock` inteiro maior ou igual a 0 (constraints de check no banco).
+- Tabela de Products: `id` UUID gerado pelo banco (`gen_random_uuid()`, ADR 0006), `name` texto obrigatório, `description` texto não nulo com padrão `''` (o contrato sempre devolve uma string), `price_cents` inteiro maior ou igual a 0, `stock` inteiro maior ou igual a 0 (constraints de check no banco).
 - Valores monetários em centavos inteiros, moeda única BRL (ADR 0005).
 - Dois databases no mesmo serviço: o de aplicação e o `ecommerce_test` para os testes de integração.
 - Não há seed neste scaffolding: os dados de demonstração vêm no Passo 7. Os testes criam os próprios dados.
@@ -125,7 +125,7 @@ Um esqueleto que atravessa todas as camadas e entrega um fluxo real e pequeno: o
   - `migrate`: execução única; aplica as migrations e termina.
   - `api`: Fastify na porta `8800`; depende de `db` saudável e de `migrate` concluído com sucesso; healthcheck em `/health`.
   - `web`: nginx com o build do Vite na porta `8080`; depende de `api` saudável; faz proxy de `/api/*` e `/health` para a API sem reescrever o caminho.
-  - Um serviço de testes E2E com a imagem oficial do Playwright, ativado só por profile de teste.
+  - Um serviço de testes E2E com a imagem oficial do Playwright, ativado só por profile de teste. Ele fica em `docker-compose.e2e.yml` e roda como projeto compose próprio, com volume de banco separado e sem portas no host, para nunca tocar nos dados de desenvolvimento (ADR 0004).
 - Todas as variáveis têm valor padrão no compose (`${VAR:-default}`), então nenhum `.env` é obrigatório. O `.env.example` documenta cada uma.
 - Portas no host: frontend `8080`, API `8800`, Postgres `5432`.
 - Dockerfiles multi-stage com a raiz do monorepo como contexto, instalando só o workspace necessário. O do frontend faz o build do Vite e copia os estáticos para o nginx.
@@ -190,4 +190,4 @@ Um esqueleto que atravessa todas as camadas e entrega um fluxo real e pequeno: o
 
 - Este documento é o entregável `docs/scaffolding-specification.md` do Passo 1.1 do curso. O blueprint (`docs/scaffolding-blueprint.md`) e os tickets (`docs/scaffolding/issues/`) vêm a seguir, via `/to-tickets`.
 - A verificação do scaffolding (`docs/scaffolding-review-report.md`) será feita com `/code-review` contra esta spec.
-- A versão do Node nas imagens deve coincidir com a do host de dev (Node 24) para que o type stripping se comporte igual nos dois ambientes.
+- A versão do Node nas imagens deve coincidir com a do host de dev (Node 24) para que o type stripping se comporte igual nos dois ambientes. A imagem do Playwright é a exceção registrada na ADR 0008: ela não usa type stripping, porque o Playwright compila o TypeScript dos testes.

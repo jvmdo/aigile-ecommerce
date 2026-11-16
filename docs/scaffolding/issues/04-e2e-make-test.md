@@ -8,7 +8,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] Serviço Playwright no compose com a imagem oficial, ativado só por profile de teste (ADR 0004).
+- [ ] Serviço Playwright no compose com a imagem oficial, ativado só por profile de teste, no override `docker-compose.e2e.yml` (ADR 0004).
 - [ ] Os testes E2E inserem os próprios dados (sem depender do seed do Passo 7).
 - [ ] E2E verifica: a página do catálogo exibe os Products do banco com preço em reais; o selo "Esgotado" aparece para Stock zero; `/health` responde `200` via nginx.
 - [ ] `make test-e2e` sobe o que for necessário, roda os testes e devolve o código de saída correto.
