@@ -10,7 +10,8 @@ export type CartAction =
   | "applyCoupon"
   | "removeCoupon"
   | "checkout"
-  | "edit";
+  | "edit"
+  | "confirm";
 
 /**
  * The Cart state machine (FRD do Carrinho, "Máquina de estados do Cart"): for each status, the
@@ -33,6 +34,7 @@ const transitions: Record<CartStatus, Partial<Record<CartAction, CartStatus>>> =
     applyCoupon: "checkout",
     removeCoupon: "checkout",
     edit: "with_items",
+    confirm: "order_created",
   },
   order_created: {},
   abandoned: {},

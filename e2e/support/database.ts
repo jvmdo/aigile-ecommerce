@@ -50,14 +50,14 @@ export async function insertCoupon({ code, type, value, expiresAt }: CouponRow):
   }
 }
 
-/** Replaces every Product in the e2e database with the given ones, and removes every Cart and Coupon. */
+/** Replaces every Product in the e2e database with the given ones, and removes every Order, Cart and Coupon. */
 export async function replaceProducts(products: ProductRow[]): Promise<void> {
   const client = new pg.Client({ connectionString: requireDatabaseUrl() });
   await client.connect();
   try {
     await client.query("BEGIN");
-    // CASCADE also empties the tables that reference these (Cart Items).
-    await client.query("TRUNCATE products, carts, coupons CASCADE");
+    // CASCADE also empties the tables that reference these (Cart Items, Order Items).
+    await client.query("TRUNCATE orders, products, carts, coupons CASCADE");
     for (const { name, description, priceCents, stock } of products) {
       await client.query(
         "INSERT INTO products (name, description, price_cents, stock) VALUES ($1, $2, $3, $4)",

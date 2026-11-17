@@ -5,6 +5,7 @@ import {
   CartItemParams,
   CartParams,
   CreateCartBody,
+  Order,
   UpdateCartItemBody,
 } from "@aigile/shared";
 import type { App } from "../app.ts";
@@ -65,5 +66,11 @@ export function registerCartRoutes(app: App, service: CartsService): void {
     "/api/carts/:id/edit",
     { schema: { params: CartParams, response: { 200: Cart } } },
     async ({ params }) => service.edit(params.id),
+  );
+
+  app.post(
+    "/api/carts/:id/confirm",
+    { schema: { params: CartParams, response: { 201: Order } } },
+    async ({ params }, reply) => reply.code(201).send(await service.confirm(params.id)),
   );
 }

@@ -3,6 +3,7 @@ import type {
   ApplyCouponBody,
   Cart,
   CreateCartBody,
+  Order,
   UpdateCartItemBody,
 } from "@aigile/shared";
 import { readStored, removeStored, writeStored } from "./browser-storage.ts";
@@ -32,25 +33,45 @@ function randomUuid(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function isCartNotFound(error: unknown): boolean {
-  return error instanceof ApiError && error.code === "CART_NOT_FOUND";
+/**
+ * Whether the stored Cart can no longer be used: it does not exist, or it already became an
+ * Order (a mutation then answers INVALID_CART_TRANSITION with `details.status`).
+ */
+function isStoredCartGone(error: unknown): boolean {
+  if (!(error instanceof ApiError)) {
+    return false;
+  }
+  if (error.code === "CART_NOT_FOUND") {
+    return true;
+  }
+  const details = error.details as { status?: unknown } | undefined;
+  return error.code === "INVALID_CART_TRANSITION" && details?.status === "order_created";
 }
 
-/** The Shopper's current Cart, or null when there is none (no Cart yet, or the stored one no longer exists). */
+/**
+ * The Shopper's current Cart, or null when there is none: no Cart yet, or the stored one no
+ * longer exists or already became an Order, in which case it is forgotten.
+ */
 export async function fetchCurrentCart(): Promise<Cart | null> {
   const cartId = readStored("cartId");
   if (cartId === null) {
     return null;
   }
+  let cart: Cart;
   try {
-    return await requestJson<Cart>("GET", `/api/carts/${cartId}`);
+    cart = await requestJson<Cart>("GET", `/api/carts/${cartId}`);
   } catch (error) {
-    if (isCartNotFound(error)) {
+    if (isStoredCartGone(error)) {
       removeStored("cartId");
       return null;
     }
     throw error;
   }
+  if (cart.status === "order_created") {
+    removeStored("cartId");
+    return null;
+  }
+  return cart;
 }
 
 async function createCart(): Promise<string> {
@@ -62,7 +83,7 @@ async function createCart(): Promise<string> {
 
 /**
  * Adds a Product to the Shopper's Cart, creating the Cart on the first addition. A stored
- * Cart that no longer exists is forgotten and replaced by a new one.
+ * Cart that no longer exists, or already became an Order, is forgotten and replaced by a new one.
  */
 export async function addToCart(item: AddCartItemBody): Promise<Cart> {
   const storedCartId = readStored("cartId");
@@ -70,7 +91,7 @@ export async function addToCart(item: AddCartItemBody): Promise<Cart> {
     try {
       return await requestJson<Cart>("POST", `/api/carts/${storedCartId}/items`, item);
     } catch (error) {
-      if (!isCartNotFound(error)) {
+      if (!isStoredCartGone(error)) {
         throw error;
       }
       removeStored("cartId");
@@ -110,4 +131,23 @@ export function checkoutCart(cartId: string): Promise<Cart> {
 /** Goes back to editing from the checkout, unlocking the items (checkout → with_items). */
 export function editCart(cartId: string): Promise<Cart> {
   return requestJson<Cart>("POST", `/api/carts/${cartId}/edit`);
+}
+
+/**
+ * Confirms the Order (checkout → order_created) and returns it. The Cart is done with, so its
+ * id is forgotten and the next addition starts a new Cart.
+ */
+export async function confirmCart(cartId: string): Promise<Order> {
+  let order: Order;
+  try {
+    order = await requestJson<Order>("POST", `/api/carts/${cartId}/confirm`);
+  } catch (error) {
+    // Already confirmed elsewhere (another tab) or gone: forget it too.
+    if (isStoredCartGone(error)) {
+      removeStored("cartId");
+    }
+    throw error;
+  }
+  removeStored("cartId");
+  return order;
 }

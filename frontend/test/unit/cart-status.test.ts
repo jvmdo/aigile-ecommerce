@@ -6,8 +6,8 @@ describe("allowedCartActions", () => {
     expect(allowedCartActions("with_items")).toEqual(["editItems", "editCoupon", "checkout"]);
   });
 
-  it("locks the items in checkout but keeps the Coupon editable and allows going back to editing", () => {
-    expect(allowedCartActions("checkout")).toEqual(["editCoupon", "edit"]);
+  it("locks the items in checkout but keeps the Coupon editable, and allows going back to editing or confirming the Order", () => {
+    expect(allowedCartActions("checkout")).toEqual(["editCoupon", "edit", "confirm"]);
   });
 
   it("allows nothing on an empty Cart or on a final one", () => {

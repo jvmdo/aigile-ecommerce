@@ -1,7 +1,11 @@
-import { type NodePgDatabase, drizzle } from "drizzle-orm/node-postgres";
+import { type NodePgDatabase, type NodePgQueryResultHKT, drizzle } from "drizzle-orm/node-postgres";
+import type { PgDatabase } from "drizzle-orm/pg-core";
 import pg from "pg";
 
 export type Database = NodePgDatabase;
+
+/** What a Repository runs its queries on: the database itself or a transaction open on it. */
+export type Queryable = PgDatabase<NodePgQueryResultHKT>;
 
 export type DatabaseConnection = {
   db: Database;

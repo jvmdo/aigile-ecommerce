@@ -9,12 +9,14 @@ export type CartPageAction =
   /** "Finalizar compra": with_items → checkout. */
   | "checkout"
   /** "Voltar para editar": checkout → with_items. */
-  | "edit";
+  | "edit"
+  /** "Confirmar pedido": checkout → order_created, creating the Order. */
+  | "confirm";
 
 const actionsByStatus: Record<CartStatus, readonly CartPageAction[]> = {
   empty: [],
   with_items: ["editItems", "editCoupon", "checkout"],
-  checkout: ["editCoupon", "edit"],
+  checkout: ["editCoupon", "edit", "confirm"],
   order_created: [],
   abandoned: [],
 };

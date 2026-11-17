@@ -301,3 +301,95 @@ test("checkout locks the items but keeps the Coupon editable, and going back to 
   await expect(page.locator(".cart-total")).toHaveText("Total: R$ 107,73");
   await expect(page.getByRole("button", { name: "Finalizar compra" })).toBeVisible();
 });
+
+test("the whole purchase: add, change, apply a Coupon, check out, edit, check out again and confirm the Order", async ({
+  page,
+}) => {
+  await insertCoupon({
+    code: "DEZ",
+    type: "percentage",
+    value: 10,
+    expiresAt: new Date("2099-01-01T00:00:00Z"),
+  });
+  await page.goto("/");
+  await addFromCatalog(page, "Caneca Esmaltada", "1");
+  await expect(productCard(page, "Caneca Esmaltada").getByRole("status")).toBeVisible();
+  await addFromCatalog(page, "Vaso de Barro", "1");
+  await expect(productCard(page, "Vaso de Barro").getByRole("status")).toBeVisible();
+  await openCart(page);
+
+  await page.getByLabel("Quantidade de Caneca Esmaltada").fill("2");
+  await page
+    .locator(".cart-item")
+    .filter({ hasText: "Caneca Esmaltada" })
+    .getByRole("button", { name: "Atualizar" })
+    .click();
+  await expect(page.locator(".cart-subtotal")).toHaveText("Subtotal: R$ 129,80");
+  await page.getByLabel("Código do cupom").fill("DEZ");
+  await page.getByRole("button", { name: "Aplicar cupom" }).click();
+  await expect(page.locator(".cart-total")).toHaveText("Total: R$ 116,82");
+
+  await page.getByRole("button", { name: "Finalizar compra" }).click();
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Em checkout");
+  await page.getByRole("button", { name: "Voltar para editar" }).click();
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Com itens");
+  await page.getByRole("button", { name: "Finalizar compra" }).click();
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Em checkout");
+
+  await page.getByRole("button", { name: "Confirmar pedido" }).click();
+
+  await expect(page).toHaveURL(/#\/pedido\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Pedido confirmado" })).toBeVisible();
+  const mug = page.locator(".order-item").filter({ hasText: "Caneca Esmaltada" });
+  await expect(mug.locator(".order-item-unit-price")).toHaveText("R$ 39,90");
+  await expect(mug.locator(".order-item-quantity")).toHaveText("2");
+  await expect(mug.locator(".order-item-line-total")).toHaveText("R$ 79,80");
+  const vase = page.locator(".order-item").filter({ hasText: "Vaso de Barro" });
+  await expect(vase.locator(".order-item-quantity")).toHaveText("1");
+  await expect(vase.locator(".order-item-line-total")).toHaveText("R$ 50,00");
+  await expect(page.locator(".order-coupon")).toHaveText("Cupom: DEZ (10% de desconto)");
+  await expect(page.locator(".order-subtotal")).toHaveText("Subtotal: R$ 129,80");
+  await expect(page.locator(".order-discount")).toHaveText("Desconto: R$ 12,98");
+  await expect(page.locator(".order-total")).toHaveText("Total: R$ 116,82");
+
+  await page.reload();
+  await expect(page.locator(".order-total")).toHaveText("Total: R$ 116,82");
+
+  await page.getByRole("link", { name: "Continuar comprando" }).click();
+  await expect(productCard(page, "Caneca Esmaltada")).toContainText("Estoque: 10");
+  await expect(productCard(page, "Vaso de Barro")).toContainText("Estoque: 2");
+  await openCart(page);
+  await expect(page.getByText("Seu carrinho está vazio.")).toBeVisible();
+
+  // The next addition starts a new Cart.
+  await page.getByRole("link", { name: "Ver o catálogo" }).click();
+  await addFromCatalog(page, "Vaso de Barro", "1");
+  await expect(productCard(page, "Vaso de Barro").getByRole("status")).toBeVisible();
+  await openCart(page);
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Com itens");
+  await expect(page.locator(".cart-item")).toHaveCount(1);
+  await expect(page.locator(".cart-total")).toHaveText("Total: R$ 50,00");
+});
+
+test("confirming after another purchase took the Stock says which Product is short and keeps the Cart in checkout", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addFromCatalog(page, "Vaso de Barro", "2");
+  await expect(productCard(page, "Vaso de Barro").getByRole("status")).toBeVisible();
+  await addFromCatalog(page, "Caneca Esmaltada", "1");
+  await expect(productCard(page, "Caneca Esmaltada").getByRole("status")).toBeVisible();
+  await openCart(page);
+  await page.getByRole("button", { name: "Finalizar compra" }).click();
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Em checkout");
+  await setStock("Vaso de Barro", 1);
+
+  await page.getByRole("button", { name: "Confirmar pedido" }).click();
+
+  await expect(page.getByRole("alert")).toHaveText(
+    "Não há estoque suficiente de: Vaso de Barro (resta 1).",
+  );
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Em checkout");
+  await page.reload();
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Em checkout");
+});

@@ -3,6 +3,7 @@ import {
   MAX_ITEM_QUANTITY,
   cartStatuses,
   couponTypes,
+  orderStatuses,
 } from "@aigile/shared";
 import { sql } from "drizzle-orm";
 import {
@@ -100,5 +101,74 @@ export const cartItems = pgTable(
       sql`${table.quantity} BETWEEN 1 AND ${sql.raw(String(MAX_ITEM_QUANTITY))}`,
     ),
     check("cart_items_unit_price_cents_non_negative", sql`${table.unitPriceCents} >= 0`),
+  ],
+);
+
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // The Shopper of the Cart the Order came from (FRD, "Identidade do Shopper").
+    shopperId: uuid("shopper_id").notNull(),
+    // A Cart becomes at most one Order.
+    cartId: uuid("cart_id")
+      .notNull()
+      .unique("orders_cart_id_unique")
+      .references(() => carts.id),
+    status: text("status", { enum: orderStatuses }).notNull().default("created"),
+    // Copies taken at confirmation, in integer cents (ADR 0005).
+    subtotalCents: integer("subtotal_cents").notNull(),
+    discountCents: integer("discount_cents").notNull(),
+    totalCents: integer("total_cents").notNull(),
+    // A copy of the Coupon as it was at confirmation, all null without one; it does not
+    // reference the Coupon row, so later changes to the Coupon leave the Order alone.
+    couponCode: text("coupon_code"),
+    couponType: text("coupon_type", { enum: couponTypes }),
+    couponValue: integer("coupon_value"),
+    // From the injected clock.
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    check(
+      "orders_status_known",
+      sql`${table.status} IN (${sql.raw(orderStatuses.map((status) => `'${status}'`).join(", "))})`,
+    ),
+    check(
+      "orders_money_non_negative",
+      sql`${table.subtotalCents} >= 0 AND ${table.discountCents} >= 0 AND ${table.totalCents} >= 0`,
+    ),
+    check(
+      "orders_coupon_all_or_nothing",
+      sql`(${table.couponCode} IS NULL AND ${table.couponType} IS NULL AND ${table.couponValue} IS NULL) OR (${table.couponCode} IS NOT NULL AND ${table.couponType} IS NOT NULL AND ${table.couponValue} IS NOT NULL)`,
+    ),
+    check(
+      "orders_coupon_type_known",
+      sql`${table.couponType} IN (${sql.raw(couponTypes.map((type) => `'${type}'`).join(", "))})`,
+    ),
+  ],
+);
+
+export const orderItems = pgTable(
+  "order_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id),
+    quantity: integer("quantity").notNull(),
+    unitPriceCents: integer("unit_price_cents").notNull(),
+    // Keeps the order of the Cart Items they were copied from; never exposed (ADR 0006).
+    insertionOrder: bigint("insertion_order", { mode: "number" }).generatedAlwaysAsIdentity(),
+  },
+  (table) => [
+    unique("order_items_order_product_unique").on(table.orderId, table.productId),
+    check(
+      "order_items_quantity_range",
+      sql`${table.quantity} BETWEEN 1 AND ${sql.raw(String(MAX_ITEM_QUANTITY))}`,
+    ),
+    check("order_items_unit_price_cents_non_negative", sql`${table.unitPriceCents} >= 0`),
   ],
 );

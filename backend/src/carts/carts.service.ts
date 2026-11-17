@@ -3,10 +3,13 @@ import {
   type Cart,
   type InsufficientStockDetail,
   MAX_ITEM_QUANTITY,
+  type Order,
   type Product,
 } from "@aigile/shared";
 import type { Clock } from "../clock.ts";
+import type { InTransaction } from "../db/transaction.ts";
 import { DomainError } from "../domain-error.ts";
+import type { OrdersService } from "../orders/orders.service.ts";
 import type { ProductsRepository } from "../products/products.repository.ts";
 import { type CartAction, invalidTransition, nextStatus } from "./cart-transitions.ts";
 import type { CartChange, CartRecord, CartsRepository, CouponRecord } from "./carts.repository.ts";
@@ -23,18 +26,28 @@ export type CartsService = {
   checkout: (cartId: string) => Promise<Cart>;
   /** Unlocks the items: checkout → with_items. */
   edit: (cartId: string) => Promise<Cart>;
+  /**
+   * Turns the Cart into an Order (checkout → order_created) in one transaction (ADR 0009):
+   * revalidates the Coupon, takes the items off the Stock, creates the Order and moves the
+   * Cart. Any failure leaves everything as it was.
+   */
+  confirm: (cartId: string) => Promise<Order>;
 };
 
 export type CartsServiceDependencies = {
   carts: CartsRepository;
   products: ProductsRepository;
+  orders: OrdersService;
   clock: Clock;
+  inTransaction: InTransaction;
 };
 
 export function createCartsService({
   carts,
   products,
+  orders,
   clock,
+  inTransaction,
 }: CartsServiceDependencies): CartsService {
   return {
     createCart: async (shopperId) => {
@@ -110,9 +123,7 @@ export function createCartsService({
         throw new DomainError("COUPON_NOT_FOUND", "Cupom não encontrado.");
       }
       const now = clock.now();
-      if (now >= coupon.expiresAt) {
-        throw new DomainError("COUPON_EXPIRED", "Este cupom expirou.");
-      }
+      assertNotExpired(coupon, now);
       const change = { from: cart.status, status, changedAt: now };
       await assertWritten(await carts.setCoupon(cartId, coupon.id, change), cartId);
       return toCart(await findCart(carts, cartId));
@@ -133,6 +144,49 @@ export function createCartsService({
     checkout: (cartId) => transition(cartId, "checkout"),
 
     edit: (cartId) => transition(cartId, "edit"),
+
+    confirm: async (cartId) => {
+      const beforeLock = await findCart(carts, cartId);
+      const status = nextStatus(beforeLock.status, "confirm");
+      const now = clock.now();
+      const orderId = await inTransaction(async (tx) => {
+        // Moving the Cart first locks its row while it is still in checkout, so its items and
+        // Coupon cannot change before the commit; they are read again under that lock.
+        const change = { from: beforeLock.status, status, changedAt: now };
+        if (!(await tx.carts.recordChange(cartId, change))) {
+          return null;
+        }
+        const locked = await findCart(tx.carts, cartId);
+        if (locked.coupon !== null) {
+          assertNotExpired(locked.coupon, now);
+        }
+        const shortages = await tx.products.decrementStock(locked.items);
+        if (shortages.length > 0) {
+          // Every short Product, not just the first; throwing rolls the whole transaction back.
+          throw insufficientStock(shortages);
+        }
+        const priced = toCart(locked);
+        return tx.orders.create({
+          shopperId: locked.shopperId,
+          cartId,
+          items: locked.items.map(({ productId, quantity, unitPriceCents }) => ({
+            productId,
+            quantity,
+            unitPriceCents,
+          })),
+          coupon: priced.coupon,
+          subtotalCents: priced.subtotalCents,
+          discountCents: priced.discountCents,
+          totalCents: priced.totalCents,
+          createdAt: now,
+        });
+      });
+      if (orderId === null) {
+        // Lost a race with another request that moved the Cart out of checkout.
+        throw invalidTransition((await findCart(carts, cartId)).status);
+      }
+      return orders.getOrder(orderId);
+    },
   };
 
   /** Moves the Cart along the table for an action that touches nothing but its status. */
@@ -164,6 +218,13 @@ async function findCart(carts: CartsRepository, id: string): Promise<CartRecord>
   return cart;
 }
 
+/** A Coupon is valid while `now` is before its expiration (FRD, "Regras do Coupon"). */
+function assertNotExpired(coupon: Pick<CouponRecord, "expiresAt">, now: Date): void {
+  if (now >= coupon.expiresAt) {
+    throw new DomainError("COUPON_EXPIRED", "Este cupom expirou.");
+  }
+}
+
 function assertInCart(cart: CartRecord, productId: string): void {
   if (!cart.items.some((item) => item.productId === productId)) {
     throw new DomainError("CART_ITEM_NOT_FOUND", "Este produto não está no carrinho.");
@@ -173,11 +234,13 @@ function assertInCart(cart: CartRecord, productId: string): void {
 /** Rejects a quantity above the Product's current Stock; nothing is reserved (FRD, "Cart Items"). */
 function assertInStock(product: Pick<Product, "id" | "stock">, requested: number): void {
   if (requested > product.stock) {
-    const details: InsufficientStockDetail[] = [
-      { productId: product.id, requested, available: product.stock },
-    ];
-    throw new DomainError("INSUFFICIENT_STOCK", "Estoque insuficiente.", details);
+    throw insufficientStock([{ productId: product.id, requested, available: product.stock }]);
   }
+}
+
+/** INSUFFICIENT_STOCK listing every short Product in `details`. */
+function insufficientStock(details: InsufficientStockDetail[]): DomainError {
+  return new DomainError("INSUFFICIENT_STOCK", "Estoque insuficiente.", details);
 }
 
 /** Computes the money fields of the Cart the API returns (FRD, "Cálculo do dinheiro"). */

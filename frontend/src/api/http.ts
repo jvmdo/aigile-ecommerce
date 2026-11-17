@@ -2,17 +2,22 @@ import type { ErrorEnvelope } from "@aigile/shared";
 
 /**
  * The API answered with a non-2xx status, or could not be reached at all (`status` and
- * `code` are then undefined). `code` is the error envelope's code; the message is a
+ * `code` are then undefined). `code` and `details` are the error envelope's; the message is a
  * diagnostic, not shown to the Shopper (Domain's `errorMessage` turns the code into text).
  */
 export class ApiError extends Error {
   readonly status: number | undefined;
   readonly code: string | undefined;
+  readonly details: unknown;
 
-  constructor(message: string, options: { status?: number; code?: string; cause?: unknown } = {}) {
+  constructor(
+    message: string,
+    options: { status?: number; code?: string; details?: unknown; cause?: unknown } = {},
+  ) {
     super(message, { cause: options.cause });
     this.status = options.status;
     this.code = options.code;
+    this.details = options.details;
   }
 }
 
@@ -33,18 +38,20 @@ export async function requestJson<T>(method: string, path: string, body?: unknow
     throw new ApiError("The API could not be reached.", { cause });
   }
   if (!response.ok) {
+    const error = await readError(response);
     throw new ApiError(`The API responded ${response.status}.`, {
       status: response.status,
-      code: await readErrorCode(response),
+      code: error?.code,
+      details: error?.details,
     });
   }
   return (await response.json()) as T;
 }
 
-async function readErrorCode(response: Response): Promise<string | undefined> {
+async function readError(response: Response): Promise<ErrorEnvelope["error"] | undefined> {
   try {
     const envelope = (await response.json()) as Partial<ErrorEnvelope>;
-    return envelope.error?.code;
+    return envelope.error;
   } catch {
     return undefined;
   }

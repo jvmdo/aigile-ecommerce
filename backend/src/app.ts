@@ -12,10 +12,14 @@ import { createCartsService } from "./carts/carts.service.ts";
 import type { Clock } from "./clock.ts";
 import type { Config } from "./config.ts";
 import type { Database } from "./db/connection.ts";
+import { createInTransaction } from "./db/transaction.ts";
 import { registerHealthRoutes } from "./health/health.controller.ts";
 import { createHealthRepository } from "./health/health.repository.ts";
 import { createHealthService } from "./health/health.service.ts";
 import { registerErrorHandlers } from "./http/error-handler.ts";
+import { registerOrderRoutes } from "./orders/orders.controller.ts";
+import { createOrdersRepository } from "./orders/orders.repository.ts";
+import { createOrdersService } from "./orders/orders.service.ts";
 import { registerProductRoutes } from "./products/products.controller.ts";
 import { createProductsRepository } from "./products/products.repository.ts";
 import { createProductsService } from "./products/products.service.ts";
@@ -46,9 +50,17 @@ export function buildApp({ db, config, clock }: AppDependencies): App {
   registerHealthRoutes(app, createHealthService(createHealthRepository(db)));
   const productsRepository = createProductsRepository(db);
   registerProductRoutes(app, createProductsService(productsRepository));
+  const ordersService = createOrdersService(createOrdersRepository(db));
+  registerOrderRoutes(app, ordersService);
   registerCartRoutes(
     app,
-    createCartsService({ carts: createCartsRepository(db), products: productsRepository, clock }),
+    createCartsService({
+      carts: createCartsRepository(db),
+      products: productsRepository,
+      orders: ordersService,
+      clock,
+      inTransaction: createInTransaction(db),
+    }),
   );
 
   return app;

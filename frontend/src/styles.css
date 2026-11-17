@@ -65,13 +65,16 @@ product-card.sold-out {
   margin-left: 0.5rem;
 }
 
-.cart-items {
+.cart-items,
+.order-items {
   width: 100%;
   border-collapse: collapse;
 }
 
 .cart-items th,
-.cart-items td {
+.cart-items td,
+.order-items th,
+.order-items td {
   padding: 0.5rem;
   border-bottom: 1px solid color-mix(in srgb, currentColor 25%, transparent);
   text-align: left;
@@ -90,11 +93,13 @@ product-card.sold-out {
   margin-left: 0.5rem;
 }
 
-.cart-summary p {
+.cart-summary p,
+.order-summary p {
   margin: 0.25rem 0;
 }
 
-.cart-total {
+.cart-total,
+.order-total {
   font-weight: bold;
 }
 
@@ -106,6 +111,7 @@ product-card.sold-out {
 
 .catalog-error,
 .cart-error,
+.order-error,
 .add-to-cart-error {
   color: #b42318;
 }
@@ -113,6 +119,7 @@ product-card.sold-out {
 @media (prefers-color-scheme: dark) {
   .catalog-error,
   .cart-error,
+  .order-error,
   .add-to-cart-error {
     color: #f97066;
   }

@@ -1,6 +1,6 @@
 import type { CartStatus, CouponType } from "@aigile/shared";
 import { and, asc, eq, sql } from "drizzle-orm";
-import type { Database } from "../db/connection.ts";
+import type { Queryable } from "../db/connection.ts";
 import { cartItems, carts, coupons, products } from "../db/schema.ts";
 
 /** A Cart as stored, before the Service computes its money fields. */
@@ -79,7 +79,7 @@ export type NewCartItem = {
   unitPriceCents: number;
 };
 
-export function createCartsRepository(db: Database): CartsRepository {
+export function createCartsRepository(db: Queryable): CartsRepository {
   return {
     create: async (shopperId, now) => {
       const [row] = await db
@@ -172,15 +172,13 @@ export function createCartsRepository(db: Database): CartsRepository {
   };
 }
 
-type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
-
 function matchesItem({ cartId, productId }: CartItemKey) {
   return and(eq(cartItems.cartId, cartId), eq(cartItems.productId, productId));
 }
 
 /** Records the change while the Cart is still in `from`; false when it no longer is. */
 async function recordChange(
-  tx: Database | Transaction,
+  tx: Queryable,
   cartId: string,
   { from, status, changedAt, couponId }: CartChange,
 ): Promise<boolean> {
