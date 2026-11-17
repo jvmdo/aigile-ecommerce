@@ -4,6 +4,8 @@ import type { OrdersRepository } from "./orders.repository.ts";
 
 export type OrdersService = {
   getOrder: (id: string) => Promise<Order>;
+  /** Whether the Shopper already has an Order with the Coupon of this (upper-case) code. */
+  hasUsedCoupon: (shopperId: string, couponCode: string) => Promise<boolean>;
 };
 
 export function createOrdersService(orders: OrdersRepository): OrdersService {
@@ -27,5 +29,8 @@ export function createOrdersService(orders: OrdersRepository): OrdersService {
         createdAt: order.createdAt.toISOString(),
       };
     },
+
+    hasUsedCoupon: (shopperId, couponCode) =>
+      orders.existsForShopperAndCoupon(shopperId, couponCode),
   };
 }

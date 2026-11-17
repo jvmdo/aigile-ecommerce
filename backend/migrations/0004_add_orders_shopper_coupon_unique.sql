@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "orders_shopper_coupon_unique" ON "orders" USING btree ("shopper_id","coupon_code") WHERE "orders"."coupon_code" IS NOT NULL;

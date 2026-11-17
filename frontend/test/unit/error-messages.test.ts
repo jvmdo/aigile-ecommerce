@@ -11,6 +11,7 @@ describe("errorMessage", () => {
     );
     expect(errorMessage("PRODUCT_NOT_FOUND")).toBe("Este produto não está mais disponível.");
     expect(errorMessage("CART_NOT_FOUND")).toBe("Seu carrinho não foi encontrado.");
+    expect(errorMessage("COUPON_ALREADY_USED")).toBe("Você já usou este cupom em outro pedido.");
   });
 
   it("explains a rejected input", () => {

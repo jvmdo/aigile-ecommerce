@@ -34,6 +34,9 @@ describe("cartErrorMessage", () => {
 
   it("gives the message of any other code as errorMessage does", () => {
     expect(cartErrorMessage("COUPON_EXPIRED", undefined, items)).toBe("Este cupom expirou.");
+    expect(cartErrorMessage("COUPON_ALREADY_USED", undefined, items)).toBe(
+      "Você já usou este cupom em outro pedido.",
+    );
   });
 
   it("falls back to the general Stock message when no short Product is known", () => {

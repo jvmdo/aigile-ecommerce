@@ -124,6 +124,9 @@ export function createCartsService({
       }
       const now = clock.now();
       assertNotExpired(coupon, now);
+      if (await orders.hasUsedCoupon(cart.shopperId, coupon.code)) {
+        throw couponAlreadyUsed();
+      }
       const change = { from: cart.status, status, changedAt: now };
       await assertWritten(await carts.setCoupon(cartId, coupon.id, change), cartId);
       return toCart(await findCart(carts, cartId));
@@ -159,6 +162,11 @@ export function createCartsService({
         const locked = await findCart(tx.carts, cartId);
         if (locked.coupon !== null) {
           assertNotExpired(locked.coupon, now);
+          // Reported before any Stock shortage (FRD, "Confirmação", step 1); a concurrent
+          // confirmation can still slip past this read, and the unique index catches it below.
+          if (await tx.orders.existsForShopperAndCoupon(locked.shopperId, locked.coupon.code)) {
+            throw couponAlreadyUsed();
+          }
         }
         const shortages = await tx.products.decrementStock(locked.items);
         if (shortages.length > 0) {
@@ -166,7 +174,7 @@ export function createCartsService({
           throw insufficientStock(shortages);
         }
         const priced = toCart(locked);
-        return tx.orders.create({
+        const created = await tx.orders.create({
           shopperId: locked.shopperId,
           cartId,
           items: locked.items.map(({ productId, quantity, unitPriceCents }) => ({
@@ -180,6 +188,12 @@ export function createCartsService({
           totalCents: priced.totalCents,
           createdAt: now,
         });
+        if (created === null) {
+          // The unique index caught a second Order of this Shopper with the Coupon, possibly
+          // from a concurrent confirmation; throwing rolls back the Stock and the Cart too.
+          throw couponAlreadyUsed();
+        }
+        return created;
       });
       if (orderId === null) {
         // Lost a race with another request that moved the Cart out of checkout.
@@ -223,6 +237,11 @@ function assertNotExpired(coupon: Pick<CouponRecord, "expiresAt">, now: Date): v
   if (now >= coupon.expiresAt) {
     throw new DomainError("COUPON_EXPIRED", "Este cupom expirou.");
   }
+}
+
+/** The Shopper already has an Order with this Coupon (FRD, "Regras do Coupon": uso único). */
+function couponAlreadyUsed(): DomainError {
+  return new DomainError("COUPON_ALREADY_USED", "Você já usou este cupom em outro pedido.");
 }
 
 function assertInCart(cart: CartRecord, productId: string): void {

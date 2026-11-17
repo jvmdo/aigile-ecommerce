@@ -1,5 +1,5 @@
 import type { AppliedCoupon, OrderStatus } from "@aigile/shared";
-import { asc, eq } from "drizzle-orm";
+import { DrizzleQueryError, and, asc, eq } from "drizzle-orm";
 import type { Queryable } from "../db/connection.ts";
 import { orderItems, orders, products } from "../db/schema.ts";
 
@@ -35,24 +35,55 @@ export type NewOrder = {
 };
 
 export type OrdersRepository = {
-  /** Inserts the Order and its items and returns the Order's id. Run it inside the confirmation's transaction. */
-  create: (order: NewOrder) => Promise<string>;
+  /**
+   * Inserts the Order and its items and returns the Order's id. Run it inside the
+   * confirmation's transaction. Returns null, inserting nothing, when the Shopper already has
+   * an Order with this Coupon (the `orders_shopper_coupon_unique` index); the transaction is
+   * then aborted and must be rolled back.
+   */
+  create: (order: NewOrder) => Promise<string | null>;
   /** The Order with its items in the order they were copied, or null when it does not exist. */
   findById: (id: string) => Promise<OrderRecord | null>;
+  /** Whether the Shopper has an Order that used the Coupon with this (upper-case) code. */
+  existsForShopperAndCoupon: (shopperId: string, couponCode: string) => Promise<boolean>;
 };
+
+const SHOPPER_COUPON_UNIQUE = "orders_shopper_coupon_unique";
+const UNIQUE_VIOLATION = "23505";
+
+/** Whether a failed query broke this unique constraint or index. */
+function violatesUnique(error: unknown, constraint: string): boolean {
+  const cause = error instanceof DrizzleQueryError ? error.cause : error;
+  return (
+    typeof cause === "object" &&
+    cause !== null &&
+    "code" in cause &&
+    cause.code === UNIQUE_VIOLATION &&
+    "constraint" in cause &&
+    cause.constraint === constraint
+  );
+}
 
 export function createOrdersRepository(db: Queryable): OrdersRepository {
   return {
     create: async ({ items, coupon, ...order }) => {
-      const [row] = await db
-        .insert(orders)
-        .values({
-          ...order,
-          couponCode: coupon?.code ?? null,
-          couponType: coupon?.type ?? null,
-          couponValue: coupon?.value ?? null,
-        })
-        .returning({ id: orders.id });
+      let row: { id: string } | undefined;
+      try {
+        [row] = await db
+          .insert(orders)
+          .values({
+            ...order,
+            couponCode: coupon?.code ?? null,
+            couponType: coupon?.type ?? null,
+            couponValue: coupon?.value ?? null,
+          })
+          .returning({ id: orders.id });
+      } catch (error) {
+        if (violatesUnique(error, SHOPPER_COUPON_UNIQUE)) {
+          return null;
+        }
+        throw error;
+      }
       if (row === undefined) {
         throw new Error("INSERT INTO orders returned no row");
       }
@@ -92,5 +123,11 @@ export function createOrdersRepository(db: Queryable): OrdersRepository {
         createdAt: row.createdAt,
       };
     },
+
+    existsForShopperAndCoupon: async (shopperId, couponCode) =>
+      (await db.$count(
+        orders,
+        and(eq(orders.shopperId, shopperId), eq(orders.couponCode, couponCode)),
+      )) > 0,
   };
 }

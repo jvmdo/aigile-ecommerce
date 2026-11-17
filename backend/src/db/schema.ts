@@ -14,6 +14,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -145,6 +146,11 @@ export const orders = pgTable(
       "orders_coupon_type_known",
       sql`${table.couponType} IN (${sql.raw(couponTypes.map((type) => `'${type}'`).join(", "))})`,
     ),
+    // A Shopper uses a Coupon in at most one Order: the guarantee that holds under concurrent
+    // confirmations (FRD, "Regras do Coupon").
+    uniqueIndex("orders_shopper_coupon_unique")
+      .on(table.shopperId, table.couponCode)
+      .where(sql`${table.couponCode} IS NOT NULL`),
   ],
 );
 

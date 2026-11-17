@@ -29,6 +29,13 @@
       "when": 1794941524993,
       "tag": "0003_create_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794942537043,
+      "tag": "0004_add_orders_shopper_coupon_unique",
+      "breakpoints": true
     }
   ]
 }

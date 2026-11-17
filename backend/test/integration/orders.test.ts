@@ -287,6 +287,90 @@ describe("Orders API", () => {
     });
   });
 
+  describe("single-use Coupon per Shopper", () => {
+    it("responds 409 COUPON_ALREADY_USED when applying a Coupon the Shopper already used in an Order", async () => {
+      const vaseId = await insertProduct({ name: "Vaso de Barro", priceCents: 5000, stock: 10 });
+      await insertCoupon({ code: "DEZ", type: "percentage", value: 10 });
+      const firstCartId = await cartInCheckout([{ productId: vaseId, quantity: 1 }], "DEZ");
+      expect((await confirm(firstCartId)).statusCode).toBe(201);
+      const secondCartId = await createCart();
+      await addItem(secondCartId, vaseId, 1);
+
+      const response = await app.inject({
+        method: "PUT",
+        url: `/api/carts/${secondCartId}/coupon`,
+        payload: { code: "dez" },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        error: { code: "COUPON_ALREADY_USED", message: expect.any(String) },
+      });
+      const cart = await app.inject({ method: "GET", url: `/api/carts/${secondCartId}` });
+      expect(cart.json()).toMatchObject({ status: "with_items", coupon: null });
+    });
+
+    it("responds 409 COUPON_ALREADY_USED when confirming a second Cart that took the Coupon before the first Order, and changes nothing", async () => {
+      const vaseId = await insertProduct({ name: "Vaso de Barro", priceCents: 5000, stock: 10 });
+      await insertCoupon({ code: "DEZ", type: "percentage", value: 10 });
+      const firstCartId = await cartInCheckout([{ productId: vaseId, quantity: 1 }], "DEZ");
+      const secondCartId = await cartInCheckout([{ productId: vaseId, quantity: 2 }], "DEZ");
+      expect((await confirm(firstCartId)).statusCode).toBe(201);
+
+      const response = await confirm(secondCartId);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        error: { code: "COUPON_ALREADY_USED", message: expect.any(String) },
+      });
+      expect(await stockOf(vaseId)).toBe(9);
+      const cart = await app.inject({ method: "GET", url: `/api/carts/${secondCartId}` });
+      expect(cart.json()).toMatchObject({ status: "checkout", coupon: { code: "DEZ" } });
+      expect(await orderCount()).toBe(1);
+    });
+
+    it("lets one of two simultaneous confirmations of the same Shopper with the same Coupon create an Order", async () => {
+      const vaseId = await insertProduct({ name: "Vaso de Barro", priceCents: 5000, stock: 10 });
+      await insertCoupon({ code: "DEZ", type: "percentage", value: 10 });
+      const firstCartId = await cartInCheckout([{ productId: vaseId, quantity: 2 }], "DEZ");
+      const secondCartId = await cartInCheckout([{ productId: vaseId, quantity: 2 }], "DEZ");
+
+      const responses = await Promise.all([confirm(firstCartId), confirm(secondCartId)]);
+
+      const statuses = responses.map((response) => response.statusCode).sort();
+      expect(statuses).toEqual([201, 409]);
+      const refused = responses.find((response) => response.statusCode === 409);
+      expect(refused?.json()).toEqual({
+        error: { code: "COUPON_ALREADY_USED", message: expect.any(String) },
+      });
+      expect(await stockOf(vaseId)).toBe(8);
+      expect(await orderCount()).toBe(1);
+    });
+
+    it("lets another Shopper apply and confirm with the same Coupon", async () => {
+      const vaseId = await insertProduct({ name: "Vaso de Barro", priceCents: 5000, stock: 10 });
+      await insertCoupon({ code: "DEZ", type: "percentage", value: 10 });
+      const firstCartId = await cartInCheckout([{ productId: vaseId, quantity: 1 }], "DEZ");
+      expect((await confirm(firstCartId)).statusCode).toBe(201);
+      const otherCartId = await cartInCheckout(
+        [{ productId: vaseId, quantity: 1 }],
+        "DEZ",
+        "5c7e2a91-3b4d-4e6f-9a8b-1c2d3e4f5a6b",
+      );
+
+      const response = await confirm(otherCartId);
+
+      expect(response.statusCode).toBe(201);
+      expect(response.json()).toMatchObject({
+        coupon: { code: "DEZ", type: "percentage", value: 10 },
+        subtotalCents: 5000,
+        discountCents: 500,
+        totalCents: 4500,
+      });
+      expect(await orderCount()).toBe(2);
+    });
+  });
+
   describe("Cart with an Order created", () => {
     it("refuses every change with 409 INVALID_CART_TRANSITION", async () => {
       const vaseId = await insertProduct({ name: "Vaso de Barro", priceCents: 5000, stock: 10 });
