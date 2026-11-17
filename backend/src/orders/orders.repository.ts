@@ -1,6 +1,7 @@
 import type { AppliedCoupon, OrderStatus } from "@aigile/shared";
-import { DrizzleQueryError, and, asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { Queryable } from "../db/connection.ts";
+import { violatesUnique } from "../db/errors.ts";
 import { orderItems, orders, products } from "../db/schema.ts";
 
 /** An Order as stored: its money and Coupon are the copies taken at confirmation. */
@@ -49,20 +50,6 @@ export type OrdersRepository = {
 };
 
 const SHOPPER_COUPON_UNIQUE = "orders_shopper_coupon_unique";
-const UNIQUE_VIOLATION = "23505";
-
-/** Whether a failed query broke this unique constraint or index. */
-function violatesUnique(error: unknown, constraint: string): boolean {
-  const cause = error instanceof DrizzleQueryError ? error.cause : error;
-  return (
-    typeof cause === "object" &&
-    cause !== null &&
-    "code" in cause &&
-    cause.code === UNIQUE_VIOLATION &&
-    "constraint" in cause &&
-    cause.constraint === constraint
-  );
-}
 
 export function createOrdersRepository(db: Queryable): OrdersRepository {
   return {

@@ -7,6 +7,7 @@ Judgement-call rules for reviewers. Anything a tool can enforce (formatting, lin
 - **Controller** handles HTTP only: reads the validated request, calls a Service, maps the result or a domain error to a response. No Drizzle, no business rules.
 - **Service** holds business rules. It knows nothing about HTTP (no request/reply objects, no status codes) and reaches the database only through a Repository.
 - **Repository** wraps Drizzle and returns plain domain data. No business rules, no HTTP.
+- A Repository may turn a known constraint violation (`violatesUnique` in `backend/src/db/errors.ts`) or a conditional write that matched no row into a typed result (`null`, `false`, a list of misses); the Service decides which domain error it means (ADR 0009).
 - Code is grouped by feature (one folder per feature with its Controller, Service and Repository), not by layer.
 - A Service that writes through several Repositories atomically uses `InTransaction` (ADR 0010).
 - Dependencies (database connection, config) are passed in when the app is built, never imported as module-level singletons, so tests can supply the test database.
