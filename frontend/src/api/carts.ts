@@ -3,6 +3,7 @@ import type {
   ApplyCouponBody,
   Cart,
   CreateCartBody,
+  InvalidCartTransitionDetail,
   Order,
   UpdateCartItemBody,
 } from "@aigile/shared";
@@ -38,7 +39,8 @@ function refusedInStatus(error: unknown): unknown {
   if (!(error instanceof ApiError) || error.code !== "INVALID_CART_TRANSITION") {
     return undefined;
   }
-  return (error.details as { status?: unknown } | undefined)?.status;
+  // Read defensively: the shape comes over the network.
+  return (error.details as Partial<InvalidCartTransitionDetail> | undefined)?.status;
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { CartStatus } from "@aigile/shared";
+import type { CartStatus, InvalidCartTransitionDetail } from "@aigile/shared";
 import { DomainError } from "../domain-error.ts";
 
 /** Every operation that changes a Cart. Removing the last item is its own action, since it leads elsewhere. */
@@ -68,9 +68,10 @@ export function nextStatus(status: CartStatus, action: CartAction): CartStatus {
 
 /** INVALID_CART_TRANSITION for a Cart in `status`, which the response carries in `details`. */
 export function invalidTransition(status: CartStatus): DomainError {
+  const details: InvalidCartTransitionDetail = { status };
   return new DomainError(
     "INVALID_CART_TRANSITION",
     "Essa ação não é permitida no estado atual do carrinho.",
-    { status },
+    details,
   );
 }

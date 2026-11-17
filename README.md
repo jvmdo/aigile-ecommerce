@@ -95,9 +95,9 @@ Os testes E2E (Playwright, imagem oficial `mcr.microsoft.com/playwright`) sobem 
 | `make migrate` | Aplica as migrations no banco da aplicação (serviço `migrate`, execução única). |
 | `make test` | Suíte completa (unidade, integração e E2E) em containers; falha se qualquer nível falhar. |
 | `make test-unit` | Testes de unidade do Domain do frontend (formatação de preço, regra de "Esgotado", validação de quantidade, mensagens por código de erro), em container. |
-| `make test-unit-host` | Os mesmos testes de unidade, no host e sem rebuild de imagem. `FILE=test/unit/money.test.ts` roda um só arquivo. Exige Node 24 e `npm install`. |
+| `make test-unit-host` | Os mesmos testes de unidade, no host e sem rebuild de imagem. `FILE=test/unit/money.test.ts` roda um só arquivo; `ARGS='-t rótulo'` repassa opções ao vitest. Exige Node 24 e `npm install`. |
 | `make test-integration` | Testes de integração do backend contra o database `ecommerce_test`, que é migrado e limpo a cada execução, em containers. |
-| `make test-integration-host` | Os mesmos testes de integração, mas no host contra o Postgres do compose, sem rebuild de imagem: o ciclo rápido durante o desenvolvimento. `FILE=test/integration/orders.test.ts` roda um só arquivo. Exige Node 24 e `npm install`. |
+| `make test-integration-host` | Os mesmos testes de integração, mas no host contra o Postgres do compose, sem rebuild de imagem: o ciclo rápido durante o desenvolvimento. `FILE=test/integration/orders.test.ts` roda um só arquivo; `ARGS='-t abandon'` repassa opções ao vitest (ex.: só os testes cujo nome contém o texto). Exige Node 24 e `npm install`. |
 | `make test-host` | Unidade e integração no host (`test-unit-host` e `test-integration-host`): a rodada completa rápida entre correções; o E2E só roda em containers. |
 | `make test-e2e` | Testes E2E com Playwright contra uma stack compose isolada, pelo nginx; remove essa stack ao final. |
 | `make dev` | Postgres em container, migrations aplicadas, backend e Vite com recarga automática no host (veja acima). Exige Node 24 e `npm install`. |

@@ -9,6 +9,7 @@ Judgement-call rules for reviewers. Anything a tool can enforce (formatting, lin
 - **Repository** wraps Drizzle and returns plain domain data. No business rules, no HTTP.
 - A Repository may turn a known constraint violation (`violatesUnique` in `backend/src/db/errors.ts`) or a conditional write that matched no row into a typed result (`null`, `false`, a list of misses); the Service decides which domain error it means (ADR 0009).
 - Code is grouped by feature (one folder per feature with its Controller, Service and Repository), not by layer.
+- A conditional write is guarded by every stored value the Service based its decision on (the status, and the last change for a time-based rule), so a request that read stale data writes nothing.
 - A Service that writes through several Repositories atomically uses `InTransaction` (ADR 0010).
 - Dependencies (database connection, config) are passed in when the app is built, never imported as module-level singletons, so tests can supply the test database.
 

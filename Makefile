@@ -34,20 +34,20 @@ check: ## Typecheck every workspace and run Biome (needs Node 24 and npm install
 test-unit: ## Frontend Domain unit tests, in a container
 	$(COMPOSE) --profile test run --rm --build test-unit
 
-test-unit-host: ## Frontend Domain unit tests on the host, no image build; one file with FILE=test/unit/money.test.ts (needs Node 24 and npm install)
-	cd frontend && npx vitest run $(FILE)
+test-unit-host: ## Frontend Domain unit tests on the host, no image build; one file with FILE=test/unit/money.test.ts, vitest options with ARGS='-t label' (needs Node 24 and npm install)
+	cd frontend && npx vitest run $(FILE) $(ARGS)
 
 test-integration: ## Backend integration tests against the ecommerce_test database, in containers
 	$(COMPOSE) --profile test run --rm --build test-integration
 
-test-integration-host: ## Backend integration tests on the host against the compose Postgres, fast loop; one file with FILE=test/integration/orders.test.ts (needs Node 24 and npm install)
+test-integration-host: ## Backend integration tests on the host against the compose Postgres, fast loop; one file with FILE=test/integration/orders.test.ts, vitest options with ARGS='-t abandon' (needs Node 24 and npm install)
 	$(COMPOSE) up -d --wait db
-	cd backend && TEST_DATABASE_URL='$(TEST_DATABASE_URL)' npx vitest run $(FILE)
+	cd backend && TEST_DATABASE_URL='$(TEST_DATABASE_URL)' npx vitest run $(FILE) $(ARGS)
 
 test-e2e: ## Playwright against a fresh, isolated compose stack through nginx; removes that stack afterwards
-	$(E2E_COMPOSE) down -v --remove-orphans
+	$(E2E_COMPOSE) --progress quiet down -v --remove-orphans
 	$(E2E_COMPOSE) run --rm --build test-e2e; status=$$?; \
-	$(E2E_COMPOSE) down -v --remove-orphans; \
+	$(E2E_COMPOSE) --progress quiet down -v --remove-orphans; \
 	exit $$status
 
 test-host: test-unit-host test-integration-host ## Unit and integration tests on the host, the quick full run between fixes; E2E only runs in containers (make test-e2e)

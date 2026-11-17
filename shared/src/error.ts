@@ -1,4 +1,5 @@
 import { type Static, Type } from "@sinclair/typebox";
+import type { CartStatus } from "./cart.ts";
 
 /** The single error shape every API error response uses (CODING_STANDARDS.md, "Errors"). */
 export const ErrorEnvelope = Type.Object({
@@ -24,6 +25,11 @@ export type DomainErrorCode =
   | "QUANTITY_LIMIT_EXCEEDED"
   | "COUPON_NOT_FOUND"
   | "COUPON_EXPIRED";
+
+/** `details` of `INVALID_CART_TRANSITION`: the status the Cart is in, which refused the action. */
+export type InvalidCartTransitionDetail = {
+  status: CartStatus;
+};
 
 /** `details` of `INSUFFICIENT_STOCK`: one entry per Product whose Stock is short. */
 export type InsufficientStockDetail = {
