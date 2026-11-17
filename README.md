@@ -44,6 +44,7 @@ Não é preciso criar `.env`: todas as variáveis têm valor padrão (veja [`.en
 | `DELETE /api/carts/:id/coupon` | Remove o Coupon e devolve `200` com o Cart; sem Coupon, apenas devolve o Cart. |
 | `POST /api/carts/:id/checkout` | Leva o Cart de `with_items` a `checkout` e devolve `200` com o Cart: os itens ficam travados, o Coupon continua editável. `409 CART_EMPTY` se o Cart está `empty`. |
 | `POST /api/carts/:id/edit` | Volta de `checkout` para `with_items` e devolve `200` com o Cart, destravando os itens. |
+| `POST /api/carts/:id/abandon` | Leva o Cart de `with_items` ou `checkout` a `abandoned` e devolve `200` com o Cart. Num Cart `empty` ou final, `409 INVALID_CART_TRANSITION`. |
 | `POST /api/carts/:id/confirm` | Só a partir de `checkout`. Numa única transação revalida o Coupon, decrementa o Stock de cada item, cria o Order e leva o Cart a `order_created`; devolve `201` com o Order. `422 COUPON_EXPIRED` se o Coupon expirou depois de aplicado; `409 INSUFFICIENT_STOCK` com `details: [{ "productId", "requested", "available" }]` listando **todos** os Products em falta; `409 COUPON_ALREADY_USED` se o Shopper já tem um Order com esse Coupon (cada Shopper usa um Coupon em no máximo um Order, garantido por um índice único mesmo com confirmações simultâneas). Em qualquer falha nada muda: sem Order, Stock intacto, Cart em `checkout`. Duas confirmações disputando a última unidade nunca vendem as duas (ADR 0009). |
 | `GET /api/orders/:id` | `200` com o Order; `404 ORDER_NOT_FOUND` se não existe. |
 
@@ -51,7 +52,9 @@ Toda rota de Cart devolve o Cart completo: `{ "id", "status", "items": [{ "produ
 
 O Order é `{ "id", "status": "created", "items": [...], "coupon", "subtotalCents", "discountCents", "totalCents", "createdAt" }`, com itens no mesmo formato dos do Cart. Ele guarda cópias dos itens, dos valores e do Coupon do momento da confirmação: alterar o Coupon depois não muda o Order.
 
-O status segue a máquina de estados do Cart: em `checkout` só se aplica ou remove o Coupon, se volta a editar ou se confirma; `order_created` é final e recusa qualquer alteração; qualquer ação que o status não permite (alterar itens em `checkout`, alterar ou remover itens e remover o Coupon de um Cart `empty`, `edit` num Cart `with_items`, `checkout` repetido, ...) responde `409 INVALID_CART_TRANSITION` com `details: { "status" }`.
+O status segue a máquina de estados do Cart: em `checkout` só se aplica ou remove o Coupon, se volta a editar, se confirma ou se abandona; `order_created` e `abandoned` são finais e recusam qualquer alteração; qualquer ação que o status não permite (alterar itens em `checkout`, alterar ou remover itens e remover o Coupon de um Cart `empty`, `edit` num Cart `with_items`, `checkout` repetido, ...) responde `409 INVALID_CART_TRANSITION` com `details: { "status" }`.
+
+Um Cart `with_items` ou `checkout` cuja última alteração (itens, Coupon ou transição) tem 24 horas ou mais passa a `abandoned` na próxima requisição sobre ele, sem job agendado: o `GET` devolve `200` com o Cart `abandoned` e qualquer alteração responde `409 INVALID_CART_TRANSITION`. Ler o Cart não reinicia a contagem; um Cart `empty` nunca é abandonado. O tempo vem do relógio injetado na montagem da aplicação.
 
 Todo erro usa o mesmo envelope: `{ "error": { "code", "message", "details"? } }`. Entrada malformada (inclusive ids que não são UUID) → `400` (`VALIDATION_ERROR`); regra de negócio violada → `404`, `409` ou `422` com um código estável (`CART_NOT_FOUND`, `INSUFFICIENT_STOCK`, ...); rota inexistente → `404`; erro inesperado → `500` (`INTERNAL_ERROR`), sem stack trace. Os schemas das respostas ficam no pacote `shared`.
 

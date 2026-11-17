@@ -69,6 +69,12 @@ export function registerCartRoutes(app: App, service: CartsService): void {
   );
 
   app.post(
+    "/api/carts/:id/abandon",
+    { schema: { params: CartParams, response: { 200: Cart } } },
+    async ({ params }) => service.abandon(params.id),
+  );
+
+  app.post(
     "/api/carts/:id/confirm",
     { schema: { params: CartParams, response: { 201: Order } } },
     async ({ params }, reply) => reply.code(201).send(await service.confirm(params.id)),

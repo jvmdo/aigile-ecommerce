@@ -11,7 +11,7 @@ import type { InTransaction } from "../db/transaction.ts";
 import { DomainError } from "../domain-error.ts";
 import type { OrdersService } from "../orders/orders.service.ts";
 import type { ProductsRepository } from "../products/products.repository.ts";
-import { type CartAction, invalidTransition, nextStatus } from "./cart-transitions.ts";
+import { type CartAction, allows, invalidTransition, nextStatus } from "./cart-transitions.ts";
 import type { CartChange, CartRecord, CartsRepository, CouponRecord } from "./carts.repository.ts";
 
 export type CartsService = {
@@ -26,6 +26,8 @@ export type CartsService = {
   checkout: (cartId: string) => Promise<Cart>;
   /** Unlocks the items: checkout → with_items. */
   edit: (cartId: string) => Promise<Cart>;
+  /** The Shopper gives up on the Cart: with_items or checkout → abandoned. */
+  abandon: (cartId: string) => Promise<Cart>;
   /**
    * Turns the Cart into an Order (checkout → order_created) in one transaction (ADR 0009):
    * revalidates the Coupon, takes the items off the Stock, creates the Order and moves the
@@ -51,14 +53,22 @@ export function createCartsService({
 }: CartsServiceDependencies): CartsService {
   return {
     createCart: async (shopperId) => {
-      const id = await carts.create(shopperId, clock.now());
-      return toCart({ id, shopperId, status: "empty", items: [], coupon: null });
+      const now = clock.now();
+      const id = await carts.create(shopperId, now);
+      return toCart({
+        id,
+        shopperId,
+        status: "empty",
+        lastChangedAt: now,
+        items: [],
+        coupon: null,
+      });
     },
 
-    getCart: async (id) => toCart(await findCart(carts, id)),
+    getCart: async (id) => toCart(await findCartAbandoningIfIdle(id)),
 
     addItem: async (cartId, { productId, quantity }) => {
-      const cart = await findCart(carts, cartId);
+      const cart = await findCartAbandoningIfIdle(cartId);
       const status = nextStatus(cart.status, "addItem");
       const product = await products.findById(productId);
       if (product === null) {
@@ -82,7 +92,7 @@ export function createCartsService({
     },
 
     updateItemQuantity: async (cartId, productId, quantity) => {
-      const cart = await findCart(carts, cartId);
+      const cart = await findCartAbandoningIfIdle(cartId);
       const status = nextStatus(cart.status, "updateItemQuantity");
       assertInCart(cart, productId);
       const product = await products.findById(productId);
@@ -101,7 +111,7 @@ export function createCartsService({
     },
 
     removeItem: async (cartId, productId) => {
-      const cart = await findCart(carts, cartId);
+      const cart = await findCartAbandoningIfIdle(cartId);
       const removesLastItem = cart.items.length === 1 && cart.items[0]?.productId === productId;
       const action: CartAction = removesLastItem ? "removeLastItem" : "removeItem";
       const status = nextStatus(cart.status, action);
@@ -116,7 +126,7 @@ export function createCartsService({
     },
 
     applyCoupon: async (cartId, code) => {
-      const cart = await findCart(carts, cartId);
+      const cart = await findCartAbandoningIfIdle(cartId);
       const status = nextStatus(cart.status, "applyCoupon");
       const coupon = await carts.findCouponByCode(code.toUpperCase());
       if (coupon === null) {
@@ -133,7 +143,7 @@ export function createCartsService({
     },
 
     removeCoupon: async (cartId) => {
-      const cart = await findCart(carts, cartId);
+      const cart = await findCartAbandoningIfIdle(cartId);
       const status = nextStatus(cart.status, "removeCoupon");
       // Removing when there is no Coupon has no effect, not even on the last change.
       if (cart.coupon === null) {
@@ -148,8 +158,10 @@ export function createCartsService({
 
     edit: (cartId) => transition(cartId, "edit"),
 
+    abandon: (cartId) => transition(cartId, "abandon"),
+
     confirm: async (cartId) => {
-      const beforeLock = await findCart(carts, cartId);
+      const beforeLock = await findCartAbandoningIfIdle(cartId);
       const status = nextStatus(beforeLock.status, "confirm");
       const now = clock.now();
       const orderId = await inTransaction(async (tx) => {
@@ -203,9 +215,36 @@ export function createCartsService({
     },
   };
 
+  /**
+   * The Cart a request is about, abandoned first when it has gone 24 hours or more without a
+   * change while with_items or in checkout (FRD, "Abandono por tempo"): there is no scheduled
+   * job, so every request settles it before doing anything else.
+   */
+  async function findCartAbandoningIfIdle(cartId: string): Promise<CartRecord> {
+    const cart = await findCart(carts, cartId);
+    const now = clock.now();
+    // Only with_items and checkout can be abandoned; an empty Cart never is.
+    if (
+      !allows(cart.status, "abandon") ||
+      now.getTime() - cart.lastChangedAt.getTime() < IDLE_LIMIT_MS
+    ) {
+      return cart;
+    }
+    // Written only while the Cart is unchanged since it was read: a mutation committed in
+    // between restarts the count and keeps it open. Either way the Cart read again is the one
+    // to go on with.
+    await carts.recordChange(cartId, {
+      from: cart.status,
+      lastChangedAt: cart.lastChangedAt,
+      status: "abandoned",
+      changedAt: now,
+    });
+    return findCart(carts, cartId);
+  }
+
   /** Moves the Cart along the table for an action that touches nothing but its status. */
   async function transition(cartId: string, action: CartAction): Promise<Cart> {
-    const cart = await findCart(carts, cartId);
+    const cart = await findCartAbandoningIfIdle(cartId);
     const status = nextStatus(cart.status, action);
     const change = { from: cart.status, status, changedAt: clock.now() };
     await assertWritten(await carts.recordChange(cartId, change), cartId);
@@ -223,6 +262,9 @@ export function createCartsService({
     }
   }
 }
+
+/** How long a Cart can go without a change before it is abandoned (FRD, "Abandono por tempo"). */
+const IDLE_LIMIT_MS = 24 * 60 * 60 * 1000;
 
 async function findCart(carts: CartsRepository, id: string): Promise<CartRecord> {
   const cart = await carts.findById(id);

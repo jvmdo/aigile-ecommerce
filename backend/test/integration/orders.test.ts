@@ -390,6 +390,7 @@ describe("Orders API", () => {
         { method: "DELETE", url: `/api/carts/${cartId}/coupon` },
         { method: "POST", url: `/api/carts/${cartId}/checkout` },
         { method: "POST", url: `/api/carts/${cartId}/edit` },
+        { method: "POST", url: `/api/carts/${cartId}/abandon` },
       ] as const;
       for (const attempt of attempts) {
         const response = await app.inject(attempt);

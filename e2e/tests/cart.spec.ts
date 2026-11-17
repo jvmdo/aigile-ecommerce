@@ -393,3 +393,34 @@ test("confirming after another purchase took the Stock says which Product is sho
   await page.reload();
   await expect(page.locator(".cart-status")).toHaveText("Estado: Em checkout");
 });
+
+test("abandoning the Cart forgets it, and the next addition starts a new Cart", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addFromCatalog(page, "Caneca Esmaltada", "2");
+  await expect(productCard(page, "Caneca Esmaltada").getByRole("status")).toBeVisible();
+  await openCart(page);
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Com itens");
+
+  await page.getByRole("button", { name: "Abandonar carrinho" }).click();
+
+  await expect(page.getByText("Você abandonou o carrinho.")).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Seu carrinho está vazio.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Ver o catálogo" }).click();
+  await addFromCatalog(page, "Vaso de Barro", "1");
+  await expect(productCard(page, "Vaso de Barro").getByRole("status")).toHaveText(
+    "Adicionado ao carrinho.",
+  );
+  await openCart(page);
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Com itens");
+  await expect(page.locator(".cart-item")).toHaveCount(1);
+  await expectCartItem(page, {
+    name: "Vaso de Barro",
+    unitPrice: "R$ 50,00",
+    quantity: "1",
+    lineTotal: "R$ 50,00",
+  });
+});

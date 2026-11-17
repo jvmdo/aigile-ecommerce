@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 import { allowedCartActions, cartStatusLabel } from "../../src/domain/cart-status.ts";
 
 describe("allowedCartActions", () => {
-  it("lets a Cart with items be edited, have its Coupon changed and go to checkout", () => {
-    expect(allowedCartActions("with_items")).toEqual(["editItems", "editCoupon", "checkout"]);
+  it("lets a Cart with items be edited, have its Coupon changed, go to checkout and be abandoned", () => {
+    expect(allowedCartActions("with_items")).toEqual([
+      "editItems",
+      "editCoupon",
+      "checkout",
+      "abandon",
+    ]);
   });
 
   it("locks the items in checkout but keeps the Coupon editable, and allows going back to editing or confirming the Order", () => {

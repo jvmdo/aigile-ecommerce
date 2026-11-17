@@ -540,13 +540,13 @@ describe("Carts API", () => {
         code: "NATAL",
         type: "percentage",
         value: 15,
-        expiresAt: new Date("2026-12-25T03:00:00Z"),
+        expiresAt: new Date("2026-11-16T18:00:00Z"),
       });
 
-      clock.set(new Date("2026-12-25T02:59:59.999Z"));
+      clock.set(new Date("2026-11-16T17:59:59.999Z"));
       expect((await applyCoupon(cartId, { code: "NATAL" })).statusCode).toBe(200);
 
-      clock.set(new Date("2026-12-25T03:00:00Z"));
+      clock.set(new Date("2026-11-16T18:00:00Z"));
       const response = await applyCoupon(cartId, { code: "NATAL" });
 
       expect(response.statusCode).toBe(422);
@@ -1001,8 +1001,163 @@ describe("Carts API", () => {
     });
   });
 
-  // The API does not return this instant; it becomes observable through abandonment after
-  // 24 h (ticket 08). Until then the test reads it from the database.
+  describe("POST /api/carts/:id/abandon", () => {
+    it("moves a Cart with_items to abandoned, keeping its items and money", async () => {
+      const cartId = await cartWithItems();
+
+      const response = await abandon(cartId);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        id: cartId,
+        status: "abandoned",
+        items: [{ name: "Vaso de Barro", quantity: 2 }],
+        subtotalCents: 10000,
+        totalCents: 10000,
+      });
+    });
+
+    it("moves a Cart in checkout to abandoned", async () => {
+      const { cartId } = await cartInCheckout();
+
+      const response = await abandon(cartId);
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ id: cartId, status: "abandoned" });
+    });
+
+    it("responds 409 INVALID_CART_TRANSITION for an empty Cart, which stays empty", async () => {
+      const cartId = await createCart();
+
+      const response = await abandon(cartId);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toEqual({
+        error: {
+          code: "INVALID_CART_TRANSITION",
+          message: expect.any(String),
+          details: { status: "empty" },
+        },
+      });
+      const cart = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+      expect(cart.json()).toMatchObject({ status: "empty" });
+    });
+
+    it("responds 404 CART_NOT_FOUND for a Cart that does not exist", async () => {
+      const response = await abandon(UNKNOWN_CART_ID);
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({ error: { code: "CART_NOT_FOUND" } });
+    });
+  });
+
+  describe("abandoned Cart", () => {
+    it("refuses every change, including a second abandonment, with 409 INVALID_CART_TRANSITION", async () => {
+      const { cartId, vaseId } = await cartInCheckout();
+      await insertCoupon({ code: "DEZ", type: "percentage", value: 10 });
+      expect((await abandon(cartId)).statusCode).toBe(200);
+
+      await expectEveryChangeRefusedAsAbandoned(cartId, vaseId);
+      const cart = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+      expect(cart.json()).toMatchObject({
+        status: "abandoned",
+        items: [{ productId: vaseId, quantity: 2 }],
+        coupon: null,
+      });
+    });
+  });
+
+  describe("abandonment after 24 hours without a change", () => {
+    it("GET returns the Cart with_items abandoned once its last change is exactly 24 hours old", async () => {
+      clock.set(new Date("2026-11-16T09:30:00Z"));
+      const cartId = await cartWithItems();
+
+      clock.set(new Date("2026-11-17T09:30:00Z"));
+      const response = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        id: cartId,
+        status: "abandoned",
+        items: [{ name: "Vaso de Barro", quantity: 2 }],
+      });
+    });
+
+    it("keeps the Cart open after 23h59 without a change", async () => {
+      clock.set(new Date("2026-11-16T09:30:00Z"));
+      const cartId = await cartWithItems();
+
+      clock.set(new Date("2026-11-17T09:29:00Z"));
+      const response = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+
+      expect(response.json()).toMatchObject({ status: "with_items" });
+    });
+
+    it("abandons a Cart in checkout too", async () => {
+      clock.set(new Date("2026-11-16T09:30:00Z"));
+      const { cartId } = await cartInCheckout();
+
+      clock.set(new Date("2026-11-17T09:30:00Z"));
+      const response = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+
+      expect(response.json()).toMatchObject({ status: "abandoned" });
+    });
+
+    it("does not restart the count on GET", async () => {
+      clock.set(new Date("2026-11-16T09:30:00Z"));
+      const cartId = await cartWithItems();
+      clock.set(new Date("2026-11-17T09:00:00Z"));
+      await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+
+      clock.set(new Date("2026-11-17T09:30:00Z"));
+      const response = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+
+      expect(response.json()).toMatchObject({ status: "abandoned" });
+    });
+
+    it("restarts the count on a change", async () => {
+      clock.set(new Date("2026-11-16T09:30:00Z"));
+      const cartId = await cartWithItems();
+      await insertCoupon({ code: "DEZ", type: "percentage", value: 10 });
+      clock.set(new Date("2026-11-17T09:00:00Z"));
+      expect((await applyCoupon(cartId, { code: "DEZ" })).statusCode).toBe(200);
+
+      clock.set(new Date("2026-11-17T09:30:00Z"));
+      const open = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+      clock.set(new Date("2026-11-18T09:00:00Z"));
+      const abandoned = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+
+      expect(open.json()).toMatchObject({ status: "with_items" });
+      expect(abandoned.json()).toMatchObject({ status: "abandoned" });
+    });
+
+    it("refuses every change with 409 INVALID_CART_TRANSITION, and the Cart stays abandoned", async () => {
+      clock.set(new Date("2026-11-16T09:30:00Z"));
+      const { cartId, vaseId } = await cartInCheckout();
+      await insertCoupon({ code: "DEZ", type: "percentage", value: 10 });
+
+      clock.set(new Date("2026-11-17T10:00:00Z"));
+      await expectEveryChangeRefusedAsAbandoned(cartId, vaseId);
+      const cart = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+      expect(cart.json()).toMatchObject({
+        status: "abandoned",
+        items: [{ productId: vaseId, quantity: 2 }],
+      });
+    });
+
+    it("never abandons an empty Cart", async () => {
+      clock.set(new Date("2026-11-16T09:30:00Z"));
+      const cartId = await createCart();
+
+      clock.set(new Date("2026-11-20T09:30:00Z"));
+      const response = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+
+      expect(response.json()).toMatchObject({ status: "empty" });
+    });
+  });
+
+  // The API does not return this instant; the abandonment tests above observe it through the
+  // 24 h rule, and these read it from the database to pin each mutation that sets it.
   describe("last change of the Cart", () => {
     async function lastChangedAt(cartId: string): Promise<Date | undefined> {
       const [row] = await database.db
@@ -1022,7 +1177,7 @@ describe("Carts API", () => {
       await addItem(cartId, { productId: mugId, quantity: 1 });
       expect(await lastChangedAt(cartId)).toEqual(new Date("2026-11-16T09:30:00Z"));
 
-      clock.set(new Date("2026-11-17T10:00:00Z"));
+      clock.set(new Date("2026-11-16T20:00:00Z"));
       await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
       expect(await lastChangedAt(cartId)).toEqual(new Date("2026-11-16T09:30:00Z"));
     });
@@ -1142,6 +1297,42 @@ describe("Carts API", () => {
 
   function checkout(cartId: string) {
     return app.inject({ method: "POST", url: `/api/carts/${cartId}/checkout` });
+  }
+
+  /**
+   * Tries every Cart mutation, including confirming and abandoning, on an abandoned Cart and
+   * expects each to be refused with 409 INVALID_CART_TRANSITION in status abandoned.
+   */
+  async function expectEveryChangeRefusedAsAbandoned(
+    cartId: string,
+    productId: string,
+  ): Promise<void> {
+    const attempts = [
+      { method: "POST", url: `/api/carts/${cartId}/items`, payload: { productId, quantity: 1 } },
+      { method: "PATCH", url: `/api/carts/${cartId}/items/${productId}`, payload: { quantity: 1 } },
+      { method: "DELETE", url: `/api/carts/${cartId}/items/${productId}` },
+      { method: "PUT", url: `/api/carts/${cartId}/coupon`, payload: { code: "DEZ" } },
+      { method: "DELETE", url: `/api/carts/${cartId}/coupon` },
+      { method: "POST", url: `/api/carts/${cartId}/checkout` },
+      { method: "POST", url: `/api/carts/${cartId}/edit` },
+      { method: "POST", url: `/api/carts/${cartId}/confirm` },
+      { method: "POST", url: `/api/carts/${cartId}/abandon` },
+    ] as const;
+    for (const attempt of attempts) {
+      const response = await app.inject(attempt);
+      expect(response.statusCode, `${attempt.method} ${attempt.url}`).toBe(409);
+      expect(response.json()).toEqual({
+        error: {
+          code: "INVALID_CART_TRANSITION",
+          message: expect.any(String),
+          details: { status: "abandoned" },
+        },
+      });
+    }
+  }
+
+  function abandon(cartId: string) {
+    return app.inject({ method: "POST", url: `/api/carts/${cartId}/abandon` });
   }
 
   function edit(cartId: string) {

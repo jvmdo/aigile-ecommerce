@@ -11,7 +11,8 @@ export type CartAction =
   | "removeCoupon"
   | "checkout"
   | "edit"
-  | "confirm";
+  | "confirm"
+  | "abandon";
 
 /**
  * The Cart state machine (FRD do Carrinho, "Máquina de estados do Cart"): for each status, the
@@ -29,12 +30,14 @@ const transitions: Record<CartStatus, Partial<Record<CartAction, CartStatus>>> =
     applyCoupon: "with_items",
     removeCoupon: "with_items",
     checkout: "checkout",
+    abandon: "abandoned",
   },
   checkout: {
     applyCoupon: "checkout",
     removeCoupon: "checkout",
     edit: "with_items",
     confirm: "order_created",
+    abandon: "abandoned",
   },
   order_created: {},
   abandoned: {},
@@ -42,6 +45,11 @@ const transitions: Record<CartStatus, Partial<Record<CartAction, CartStatus>>> =
 
 /** Forbidden on an empty Cart for lack of items, so they get the more specific CART_EMPTY. */
 const needsItems: ReadonlySet<CartAction> = new Set(["applyCoupon", "checkout"]);
+
+/** Whether the table allows `action` on a Cart in `status`. */
+export function allows(status: CartStatus, action: CartAction): boolean {
+  return transitions[status][action] !== undefined;
+}
 
 /**
  * The status a Cart moves to when `action` is applied in `status`. Throws CART_EMPTY or

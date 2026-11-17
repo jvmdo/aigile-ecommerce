@@ -8,6 +8,8 @@ export type CartRecord = {
   id: string;
   shopperId: string;
   status: CartStatus;
+  /** When the Cart last changed (creation, items, Coupon or status); reads leave it alone. */
+  lastChangedAt: Date;
   items: CartItemRecord[];
   coupon: CouponRecord | null;
 };
@@ -62,11 +64,13 @@ export type CartItemKey = {
 /**
  * What a successful mutation records on the Cart: the status the Service chose and when.
  * `from` is the status the Service checked the action against; the write only happens while
- * the Cart is still in it. `couponId: null` also removes the Coupon (the last item left);
- * left out, the Coupon stays.
+ * the Cart is still in it, and, when `lastChangedAt` is given, while its last change is still
+ * that one. `couponId: null` also removes the Coupon (the last item left); left out, the
+ * Coupon stays.
  */
 export type CartChange = {
   from: CartStatus;
+  lastChangedAt?: Date;
   status: CartStatus;
   changedAt: Date;
   couponId?: string | null;
@@ -98,6 +102,7 @@ export function createCartsRepository(db: Queryable): CartsRepository {
           id: carts.id,
           shopperId: carts.shopperId,
           status: carts.status,
+          lastChangedAt: carts.lastChangedAt,
           coupon: {
             id: coupons.id,
             code: coupons.code,
@@ -176,16 +181,22 @@ function matchesItem({ cartId, productId }: CartItemKey) {
   return and(eq(cartItems.cartId, cartId), eq(cartItems.productId, productId));
 }
 
-/** Records the change while the Cart is still in `from`; false when it no longer is. */
+/** Records the change while the Cart is still as it was read; false when it no longer is. */
 async function recordChange(
   tx: Queryable,
   cartId: string,
-  { from, status, changedAt, couponId }: CartChange,
+  { from, lastChangedAt, status, changedAt, couponId }: CartChange,
 ): Promise<boolean> {
   const updated = await tx
     .update(carts)
     .set({ status, lastChangedAt: changedAt, couponId })
-    .where(and(eq(carts.id, cartId), eq(carts.status, from)))
+    .where(
+      and(
+        eq(carts.id, cartId),
+        eq(carts.status, from),
+        lastChangedAt === undefined ? undefined : eq(carts.lastChangedAt, lastChangedAt),
+      ),
+    )
     .returning({ id: carts.id });
   return updated.length > 0;
 }

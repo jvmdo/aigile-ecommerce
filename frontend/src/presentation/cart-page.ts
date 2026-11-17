@@ -1,10 +1,12 @@
 import type { Cart, CartItem } from "@aigile/shared";
 import {
+  abandonCart,
   applyCoupon,
   checkoutCart,
   confirmCart,
   editCart,
   fetchCurrentCart,
+  isAbandonedError,
   removeCartItem,
   removeCoupon,
   updateCartItem,
@@ -30,7 +32,9 @@ import { apiErrorMessage, createQuantityInput } from "./quantity-input.ts";
  * message. Which controls appear follows the actions the status allows (Domain): with_items
  * edits the items and offers "Finalizar compra"; checkout shows them read-only and offers
  * "Voltar para editar" and "Confirmar pedido", which opens the Order's confirmation page.
- * Every change redraws the page from the Cart the API returns.
+ * "Abandonar carrinho" (with_items) gives the Cart up. A stored Cart found abandoned, on
+ * loading or because a change was refused for it, shows "Seu carrinho expirou". Every change
+ * redraws the page from the Cart the API returns.
  */
 export class CartPage extends HTMLElement {
   connectedCallback(): void {
@@ -56,15 +60,24 @@ export class CartPage extends HTMLElement {
   }
 
   private show(cart: Cart | null): void {
+    if (cart?.status === "abandoned") {
+      this.showAbandoned();
+      return;
+    }
     if (cart === null || cart.items.length === 0) {
-      this.showEmpty();
+      this.showWithCatalogLink("cart-empty", "Seu carrinho está vazio.");
       return;
     }
     this.showCart(cart);
   }
 
-  private showEmpty(): void {
-    const message = createTextElement("p", "cart-message cart-empty", "Seu carrinho está vazio. ");
+  private readonly showAbandoned = (): void => {
+    this.showWithCatalogLink("cart-abandoned", "Seu carrinho expirou.");
+  };
+
+  /** A message in place of the Cart, with a link back to the catalog. */
+  private showWithCatalogLink(className: string, text: string): void {
+    const message = createTextElement("p", `cart-message ${className}`, `${text} `);
     const link = document.createElement("a");
     link.href = "#/";
     link.textContent = "Ver o catálogo";
@@ -85,6 +98,11 @@ export class CartPage extends HTMLElement {
       try {
         this.show(await request());
       } catch (error) {
+        if (isAbandonedError(error)) {
+          // Abandoned meanwhile (24 hours without a change): loading forgets it and says so.
+          await this.load();
+          return;
+        }
         showError(feedback, apiErrorMessage(error));
       } finally {
         button.disabled = false;
@@ -113,7 +131,16 @@ export class CartPage extends HTMLElement {
     }
     const transitions = createTransitions(cart, actions, change);
     if (actions.includes("confirm")) {
-      transitions.append(createConfirmButton(cart, feedback));
+      transitions.append(createConfirmButton(cart, feedback, this.showAbandoned));
+    }
+    if (actions.includes("abandon")) {
+      transitions.append(
+        createAbandonButton(cart, feedback, {
+          onAbandoned: () =>
+            this.showWithCatalogLink("cart-given-up", "Você abandonou o carrinho."),
+          onAlreadyAbandoned: this.showAbandoned,
+        }),
+      );
     }
     parts.push(createSummary("cart", cart), transitions);
     this.replaceChildren(...parts);
@@ -121,11 +148,44 @@ export class CartPage extends HTMLElement {
 }
 
 /**
+ * "Abandonar carrinho": gives the Cart up; the API forgets it, so the next addition starts a
+ * new one. A Cart already abandoned by the 24 hours without a change shows that it expired.
+ */
+function createAbandonButton(
+  cart: Cart,
+  feedback: HTMLElement,
+  { onAbandoned, onAlreadyAbandoned }: { onAbandoned: () => void; onAlreadyAbandoned: () => void },
+): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "Abandonar carrinho";
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      await abandonCart(cart.id);
+      onAbandoned();
+    } catch (error) {
+      if (isAbandonedError(error)) {
+        onAlreadyAbandoned();
+        return;
+      }
+      showError(feedback, apiErrorMessage(error));
+      button.disabled = false;
+    }
+  });
+  return button;
+}
+
+/**
  * "Confirmar pedido": creates the Order and opens its confirmation page. A refusal (Stock
  * taken by another purchase, expired Coupon) leaves the Cart in checkout and says why,
- * naming every short Product.
+ * naming every short Product; a Cart abandoned meanwhile shows that it expired.
  */
-function createConfirmButton(cart: Cart, feedback: HTMLElement): HTMLButtonElement {
+function createConfirmButton(
+  cart: Cart,
+  feedback: HTMLElement,
+  onAbandoned: () => void,
+): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
   button.textContent = "Confirmar pedido";
@@ -135,6 +195,10 @@ function createConfirmButton(cart: Cart, feedback: HTMLElement): HTMLButtonEleme
       const order = await confirmCart(cart.id);
       location.hash = `#/pedido/${order.id}`;
     } catch (error) {
+      if (isAbandonedError(error)) {
+        onAbandoned();
+        return;
+      }
       const apiError = error instanceof ApiError ? error : undefined;
       showError(feedback, cartErrorMessage(apiError?.code, apiError?.details, cart.items));
       button.disabled = false;

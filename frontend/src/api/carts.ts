@@ -33,24 +33,38 @@ function randomUuid(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+/** The status a change was refused in, from INVALID_CART_TRANSITION's `details`. */
+function refusedInStatus(error: unknown): unknown {
+  if (!(error instanceof ApiError) || error.code !== "INVALID_CART_TRANSITION") {
+    return undefined;
+  }
+  return (error.details as { status?: unknown } | undefined)?.status;
+}
+
 /**
- * Whether the stored Cart can no longer be used: it does not exist, or it already became an
- * Order (a mutation then answers INVALID_CART_TRANSITION with `details.status`).
+ * Whether the stored Cart can no longer be used: it does not exist, already became an Order
+ * or was abandoned (a change is then refused with that status).
  */
 function isStoredCartGone(error: unknown): boolean {
-  if (!(error instanceof ApiError)) {
-    return false;
-  }
-  if (error.code === "CART_NOT_FOUND") {
+  if (error instanceof ApiError && error.code === "CART_NOT_FOUND") {
     return true;
   }
-  const details = error.details as { status?: unknown } | undefined;
-  return error.code === "INVALID_CART_TRANSITION" && details?.status === "order_created";
+  const status = refusedInStatus(error);
+  return status === "order_created" || status === "abandoned";
+}
+
+/**
+ * Whether a refused change means the Cart was abandoned meanwhile (24 hours without a change,
+ * or in another tab), so the page should say so.
+ */
+export function isAbandonedError(error: unknown): boolean {
+  return refusedInStatus(error) === "abandoned";
 }
 
 /**
  * The Shopper's current Cart, or null when there is none: no Cart yet, or the stored one no
- * longer exists or already became an Order, in which case it is forgotten.
+ * longer exists or already became an Order, in which case it is forgotten. A stored Cart found
+ * abandoned is forgotten too, but returned, so the page can say it expired.
  */
 export async function fetchCurrentCart(): Promise<Cart | null> {
   const cartId = readStored("cartId");
@@ -71,6 +85,9 @@ export async function fetchCurrentCart(): Promise<Cart | null> {
     removeStored("cartId");
     return null;
   }
+  if (cart.status === "abandoned") {
+    removeStored("cartId");
+  }
   return cart;
 }
 
@@ -83,7 +100,7 @@ async function createCart(): Promise<string> {
 
 /**
  * Adds a Product to the Shopper's Cart, creating the Cart on the first addition. A stored
- * Cart that no longer exists, or already became an Order, is forgotten and replaced by a new one.
+ * Cart that no longer exists, already became an Order or was abandoned, is forgotten and replaced by a new one.
  */
 export async function addToCart(item: AddCartItemBody): Promise<Cart> {
   const storedCartId = readStored("cartId");
@@ -131,6 +148,25 @@ export function checkoutCart(cartId: string): Promise<Cart> {
 /** Goes back to editing from the checkout, unlocking the items (checkout → with_items). */
 export function editCart(cartId: string): Promise<Cart> {
   return requestJson<Cart>("POST", `/api/carts/${cartId}/edit`);
+}
+
+/**
+ * Abandons the Cart (with_items or checkout → abandoned) and forgets it, so the next addition
+ * starts a new Cart for the same Shopper. A Cart already gone (abandoned by time, ordered or
+ * unknown) is forgotten too.
+ */
+export async function abandonCart(cartId: string): Promise<Cart> {
+  let cart: Cart;
+  try {
+    cart = await requestJson<Cart>("POST", `/api/carts/${cartId}/abandon`);
+  } catch (error) {
+    if (isStoredCartGone(error)) {
+      removeStored("cartId");
+    }
+    throw error;
+  }
+  removeStored("cartId");
+  return cart;
 }
 
 /**
