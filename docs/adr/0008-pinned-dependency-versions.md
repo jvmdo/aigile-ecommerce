@@ -18,6 +18,7 @@ This project is built by coding agents, so we pin each dependency to a major/min
 | `@playwright/test` and image `mcr.microsoft.com/playwright` | 1.52.0 (exact, same in both) | The npm package and the Docker image must match |
 | `@biomejs/biome` | 1.9.4 (exact) | 1.x config format, not Biome 2 |
 | `concurrently` | ^9 | |
+| `@faker-js/faker` | ~9.9 | Synthetic data for `make seed` (backend dev dependency); the 9.x API, not 10.x |
 | PostgreSQL image | `postgres:17-alpine` | |
 | nginx image | `nginx:1.27-alpine` | |
 

@@ -77,6 +77,23 @@ services:
       timeout: 3s
       retries: 10
 
+  # Synthetic data for demonstration, only on `make seed`: deletes and recreates every
+  # Product, Coupon, Cart and Order of the application database.
+  seed:
+    profiles: ["seed"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: seed
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-ecommerce}:${POSTGRES_PASSWORD:-ecommerce}@db:5432/${POSTGRES_DB:-ecommerce}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
   test-unit:
     profiles: ["test"]
     build:

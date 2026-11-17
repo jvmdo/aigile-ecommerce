@@ -9,7 +9,7 @@ TEST_DATABASE_URL ?= postgres://$(or $(POSTGRES_USER),ecommerce):$(or $(POSTGRES
 # The E2E stack runs as its own compose project (see docker-compose.e2e.yml).
 E2E_COMPOSE := $(COMPOSE) -p aigile-ecommerce-e2e -f docker-compose.yml -f docker-compose.e2e.yml --profile test
 
-.PHONY: up down logs migrate dev check test test-host test-unit test-unit-host test-integration test-integration-host test-e2e
+.PHONY: up down logs migrate seed dev check test test-host test-unit test-unit-host test-integration test-integration-host test-e2e
 
 up: ## Build and start the stack in the background, waiting until it is healthy
 	$(COMPOSE) up -d --build --wait
@@ -22,6 +22,9 @@ logs: ## Follow the logs of every service
 
 migrate: ## Apply the database migrations (one-shot migrate service) and exit
 	$(COMPOSE) run --rm --build migrate
+
+seed: ## Delete and recreate the demonstration data (Products, Coupons, Carts, Orders) in the application database (one-shot seed service)
+	$(COMPOSE) --profile seed run --rm --build seed
 
 dev: ## Postgres in a container, migrations applied, backend and Vite with reload on the host (needs Node 24 and npm install)
 	$(COMPOSE) up -d --wait db

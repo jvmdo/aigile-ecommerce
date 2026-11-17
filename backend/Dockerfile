@@ -21,6 +21,16 @@ USER node
 WORKDIR /app/backend
 CMD ["npx", "drizzle-kit", "migrate"]
 
+# One-shot synthetic data (make seed): empties and refills the application database, then exits.
+FROM dev-deps AS seed
+COPY tsconfig.base.json ./
+COPY shared/src shared/src
+COPY backend/src backend/src
+COPY backend/scripts backend/scripts
+USER node
+WORKDIR /app/backend
+CMD ["node", "scripts/seed.ts"]
+
 # Integration tests: migrate and clean ecommerce_test, then run Vitest.
 FROM dev-deps AS test
 COPY tsconfig.base.json ./

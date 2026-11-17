@@ -58,6 +58,14 @@ Um Cart `with_items` ou `checkout` cuja última alteração (itens, Coupon ou tr
 
 Todo erro usa o mesmo envelope: `{ "error": { "code", "message", "details"? } }`. Entrada malformada (inclusive ids que não são UUID) → `400` (`VALIDATION_ERROR`); regra de negócio violada → `404`, `409` ou `422` com um código estável (`CART_NOT_FOUND`, `INSUFFICIENT_STOCK`, ...); rota inexistente → `404`; erro inesperado → `500` (`INTERNAL_ERROR`), sem stack trace. Os schemas das respostas ficam no pacote `shared`.
 
+## Dados de demonstração (`make seed`)
+
+```sh
+make seed
+```
+
+Apaga todos os Products, Coupons, Carts e Orders do banco da aplicação e o povoa com dados sintéticos: cerca de 300 Products, 40 Coupons, 1.000 Shoppers, 1.500 Carts nos cinco status e 700 Orders, com datas espalhadas pelos últimos meses. Carts e Orders passam pelo Service de carts, então seguem as mesmas regras da API. A semente é fixa: cada execução recria o mesmo estado, relativo ao instante em que roda. Roda num container (serviço `seed`, depois do `migrate`), funciona com `make up` ou `make dev` de pé e se recusa a rodar no `ecommerce_test`. Nenhum teste depende desses dados. O que é gerado, os casos de borda e como assumir um Shopper de demonstração no navegador estão em [`docs/seeds-report.md`](docs/seeds-report.md).
+
 ## Desenvolvimento (`make dev`)
 
 Exige Node 24 no host e `npm install` na raiz, uma vez.
@@ -93,6 +101,7 @@ Os testes E2E (Playwright, imagem oficial `mcr.microsoft.com/playwright`) sobem 
 | `make down` | Derruba a stack (o volume do banco é mantido). |
 | `make logs` | Acompanha os logs de todos os serviços. |
 | `make migrate` | Aplica as migrations no banco da aplicação (serviço `migrate`, execução única). |
+| `make seed` | Apaga e recria os dados de demonstração (Products, Coupons, Carts e Orders) no banco da aplicação (serviço `seed`, execução única). Veja [`docs/seeds-report.md`](docs/seeds-report.md). |
 | `make test` | Suíte completa (unidade, integração e E2E) em containers; falha se qualquer nível falhar. |
 | `make test-unit` | Testes de unidade do Domain do frontend (formatação de preço, regra de "Esgotado", validação de quantidade, mensagens por código de erro), em container. |
 | `make test-unit-host` | Os mesmos testes de unidade, no host e sem rebuild de imagem. `FILE=test/unit/money.test.ts` roda um só arquivo; `ARGS='-t rótulo'` repassa opções ao vitest. Exige Node 24 e `npm install`. |
