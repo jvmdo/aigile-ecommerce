@@ -17,3 +17,7 @@
 - [x] Erros de validação de schema viram `400` e erros inesperados viram `500`, ambos no envelope de erro e sem stack trace. O teste do `400` fica para a primeira rota com entrada (feature do Cart).
 - [x] Testes de integração no `ecommerce_test` (migrado e limpo a cada execução): campos do contrato, ordem por nome, catálogo vazio, Product com Stock zero.
 - [x] README atualizado com `GET /api/products` e `make migrate`.
+
+## Comments
+
+- **Teste do `400` adiado e depois coberto.** No scaffolding não havia rota com entrada, então o teste do `400` ficou para a feature do Cart (só um comentário em `backend/test/integration/errors.test.ts`). Ele foi coberto em `backend/test/integration/carts.test.ts` (`responds 400 VALIDATION_ERROR ...`), no commit `219f256` (ticket `docs/carrinho/issues/02-adicionar-e-ver-cart.md`). Por isso o critério está marcado.

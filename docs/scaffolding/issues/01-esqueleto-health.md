@@ -14,9 +14,13 @@
 - [x] A configuração vem de variáveis de ambiente, é validada ao iniciar e derruba o processo com mensagem clara se for inválida.
 - [x] `GET /health` executa `SELECT 1` e responde `200 { status: "ok" }` com o banco acessível e `503` com o banco inacessível.
 - [x] O compose tem `db` (Postgres com healthcheck e volume nomeado) e `api` (dependendo do `db` saudável, com healthcheck em `/health`); todas as variáveis têm padrão `${VAR:-default}`, e `docker compose up` funciona sem `.env`.
-- [x] O database `ecommerce_test` existe no mesmo serviço Postgres.
+- [ ] O database `ecommerce_test` existe no mesmo serviço Postgres.
 - [x] Testes de integração do `/health` (200 com banco real; 503 com conexão inválida nas dependências) rodam em container via `make test-integration`.
 - [x] Makefile com `up`, `down`, `logs`, `check` (`tsc --noEmit` em todos os workspaces + Biome) e `test-integration`.
 - [x] Biome configurado para o monorepo, e `make check` passa.
 - [x] `.gitignore` cobre dependências, builds, relatórios de teste e `.env`; `.env.example` documenta cada variável e seu padrão.
 - [x] README atualizado: pré-requisito (só Docker), `docker compose up`, porta da API, `/health` e os alvos do Makefile existentes.
+
+## Comments
+
+- **`ecommerce_test` só existe com volume novo (critério desmarcado).** O banco é criado por `docker/postgres/init-test-database.sql` apenas na primeira inicialização do volume do Postgres. Com um volume `db` anterior a esse script, `make test-integration` falha porque o banco não existe. O contorno está no README (`docker compose down -v`, que apaga os dados locais). Registrado em `docs/scaffolding-review-report.md`; o critério fica desmarcado até o banco ser criado também em volumes existentes.

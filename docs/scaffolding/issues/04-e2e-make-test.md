@@ -15,3 +15,7 @@
 - [x] `make test` roda unidade, integração e E2E em containers e falha se qualquer nível falhar.
 - [x] `make test` funciona numa máquina com apenas Docker.
 - [x] README atualizado com `make test` como comando da suíte completa e `make test-e2e`.
+
+## Comments
+
+- **`make test` para no primeiro nível que falha (divergência aceita).** O alvo é `test: test-unit test-integration test-e2e`: o código de saída é diferente de zero se qualquer nível falhar, como o critério pede, mas os níveis seguintes ao que falhou não chegam a rodar. O README documenta o comportamento. Registrado em `docs/scaffolding-review-report.md`.

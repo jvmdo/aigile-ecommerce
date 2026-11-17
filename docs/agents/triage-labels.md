@@ -10,6 +10,8 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 | `ready-for-human`          | `ready-for-human`    | Requires human implementation            |
 | `wontfix`                  | `wontfix`            | Will not be actioned                     |
 
+Besides the five roles, a ticket's status line can be `resolved`: the ticket is closed, not awaiting triage. It is valid in `**Status:**` but is not a triage role, so never re-triage a `resolved` ticket as `needs-triage`. See `issue-tracker.md` for how tickets are closed and reopened.
+
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
 Edit the "Label in our tracker" column to match whatever vocabulary you actually use.
