@@ -91,6 +91,76 @@ location.reload();
 
 Os Carts de demonstração abertos foram alterados entre 30 min e 3 h antes do seed. **Depois de 24 h eles passam a Abandonado** ao serem abertos, e o Coupon `RELAMPAGO20` vence 4 h após o seed. Para demonstrar, rode `make seed` pouco antes. Cada cenário que confirma ou abandona um Cart muda o estado; um novo `make seed` restaura tudo.
 
+## Coupons para testar
+
+Não há API nem tela que liste Coupons. Os códigos abaixo são os mesmos em todo `make seed`, porque a semente é fixa. A validade é contada a partir do instante em que o seed rodou. Num Cart Com Itens ou Em Checkout, digite o código no campo "Código do cupom"; maiúsculas e minúsculas não fazem diferença.
+
+### Um código por caso
+
+| Caso | Código | Resultado esperado |
+| --- | --- | --- |
+| Percentual comum | `TECH30` | 30% do Subtotal, arredondado para baixo no centavo |
+| Fixo comum | `CAFE35REAIS` | R$ 35,00 de desconto |
+| Menor percentual | `DESCONTINHO1` | 1% do Subtotal |
+| 100% | `CORTESIA100` | Total R$ 0,00 |
+| Fixo maior que o Subtotal | `VALE500` | Desconto igual ao Subtotal, Total R$ 0,00 |
+| Vence em poucas horas | `RELAMPAGO20` | Válido por 4 h depois do seed; depois, "Este cupom expirou." |
+| Expirado | `INVERNO20` | "Este cupom expirou." |
+| Inexistente | `NAOEXISTE` | "Cupom não encontrado." |
+| Já usado pelo Shopper | `BEMVINDO10` com o Shopper de demonstração "Coupon já usado" | "Você já usou este cupom em outro pedido." |
+| Trocar de Coupon | `TECH30` e depois `VALE500` | O segundo substitui o primeiro; Coupons não acumulam |
+
+### Todos os Coupons
+
+| Código | Tipo | Desconto | Validade a partir do seed |
+| --- | --- | --- | --- |
+| `ANIVERSARIO25` | percentual | 25% | 53 dias |
+| `ANIVERSARIO60REAIS` | fixo | R$ 60,00 | 125 dias |
+| `APP10` | percentual | 10% | 98 dias |
+| `APP15` | percentual | 15% | 93 dias |
+| `BEMVINDO10` | percentual | 10% | 60 dias |
+| `CAFE150REAIS` | fixo | R$ 150,00 | 97 dias |
+| `CAFE35REAIS` | fixo | R$ 35,00 | 143 dias |
+| `CASA15` | percentual | 15% | 21 dias |
+| `CLIENTEVIP125REAIS` | fixo | R$ 125,00 | 49 dias |
+| `CLIENTEVIP65REAIS` | fixo | R$ 65,00 | 89 dias |
+| `CORTESIA100` | percentual | 100% | 30 dias |
+| `DESCONTINHO1` | percentual | 1% | 45 dias |
+| `FRETE10` | percentual | 10% | 70 dias |
+| `INDICACAO15` | percentual | 15% | 130 dias |
+| `INDICACAO55REAIS` | fixo | R$ 55,00 | 69 dias |
+| `LEITURA10` | percentual | 10% | 89 dias |
+| `NATAL135REAIS` | fixo | R$ 135,00 | 89 dias |
+| `NATAL145REAIS` | fixo | R$ 145,00 | 36 dias |
+| `NATAL60REAIS` | fixo | R$ 60,00 | 76 dias |
+| `NEWSLETTER25` | percentual | 25% | 110 dias |
+| `NEWSLETTER80REAIS` | fixo | R$ 80,00 | 166 dias |
+| `OUTONO5` | percentual | 5% | 141 dias |
+| `RELAMPAGO20` | percentual | 20% | 4 h |
+| `SEMANA20` | percentual | 20% | 124 dias |
+| `TECH20` | percentual | 20% | 140 dias |
+| `TECH30` | percentual | 30% | 65 dias |
+| `TECH50REAIS` | fixo | R$ 50,00 | 54 dias |
+| `ULTIMAHORA10` | percentual | 10% | 9 h |
+| `VALE500` | fixo | R$ 500,00 | 90 dias |
+| `VOLTEI10` | percentual | 10% | 112 dias |
+| `VOLTEI15` | percentual | 15% | 58 dias |
+| `VOLTEI25REAIS` | fixo | R$ 25,00 | 119 dias |
+| `APP50REAIS` | fixo | R$ 50,00 | expirado 72 dias antes |
+| `CASA25` | percentual | 25% | expirado 21 dias antes |
+| `FLASH25` | percentual | 25% | expirado 1 h antes |
+| `INVERNO20` | percentual | 20% | expirado 45 dias antes |
+| `PIX85REAIS` | fixo | R$ 85,00 | expirado 26 dias antes |
+| `PRIMAVERA15` | percentual | 15% | expirado 10 dias antes |
+| `TECH25` | percentual | 25% | expirado 24 dias antes |
+| `VERAO20` | percentual | 20% | expirado 11 dias antes |
+
+Os 9 primeiros códigos do seed são fixos: `BEMVINDO10`, `FLASH25`, `CORTESIA100`, `VALE500`, `DESCONTINHO1`, `RELAMPAGO20`, `ULTIMAHORA10`, `PRIMAVERA15` e `INVERNO20`. Os outros 31 são gerados. Com a stack de pé, a lista pode ser conferida direto no banco:
+
+```sh
+docker compose exec db psql -U ecommerce -c "select code, type, value, expires_at from coupons order by code"
+```
+
 ## O sistema continua funcional
 
 Verificação de fumaça feita em 17/11/2026 com os dados carregados, contra o backend e o frontend do `make dev`:

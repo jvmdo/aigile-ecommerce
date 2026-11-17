@@ -4,13 +4,23 @@ E-commerce simplificado (catálogo, carrinho, cupons e pedidos) desenvolvido com
 
 ## Pré-requisito
 
-Apenas **Docker** (com Docker Compose). Nada mais precisa estar instalado: banco, API e testes rodam em containers.
+Apenas **Docker** (com Docker Compose). Nada mais precisa estar instalado: banco, API, seed e testes rodam em containers. Os comandos `make` são atalhos para o Docker Compose; para subir o sistema e rodar o seed, o README também mostra o comando `docker compose` equivalente, para quem não tem `make`.
 
 ## Subir o sistema
 
 ```sh
-docker compose up
+make up      # constrói e sobe a stack em segundo plano, esperando os healthchecks
+make seed    # opcional: povoa o banco com os dados de demonstração
 ```
+
+Sem `make`, o equivalente é:
+
+```sh
+docker compose up -d --build --wait
+docker compose --profile seed run --rm --build seed
+```
+
+Sem o seed, o catálogo começa vazio. Veja [Dados de demonstração](#dados-de-demonstração-make-seed) para o que ele gera e como ver os cenários no navegador. `make down` (ou `docker compose down`) derruba a stack e mantém o banco.
 
 Antes de a API subir, o serviço `migrate` aplica as migrations do banco e termina; a `api` só inicia se ele concluir com sucesso.
 
@@ -62,9 +72,11 @@ Todo erro usa o mesmo envelope: `{ "error": { "code", "message", "details"? } }`
 
 ```sh
 make seed
+# sem make:
+docker compose --profile seed run --rm --build seed
 ```
 
-Apaga todos os Products, Coupons, Carts e Orders do banco da aplicação e o povoa com dados sintéticos: cerca de 300 Products, 40 Coupons, 1.000 Shoppers, 1.500 Carts nos cinco status e 700 Orders, com datas espalhadas pelos últimos meses. Carts e Orders passam pelo Service de carts, então seguem as mesmas regras da API. A semente é fixa: cada execução recria o mesmo estado, relativo ao instante em que roda. Roda num container (serviço `seed`, depois do `migrate`), funciona com `make up` ou `make dev` de pé e se recusa a rodar no `ecommerce_test`. Nenhum teste depende desses dados. O que é gerado, os casos de borda e como assumir um Shopper de demonstração no navegador estão em [`docs/seeds-report.md`](docs/seeds-report.md).
+Apaga todos os Products, Coupons, Carts e Orders do banco da aplicação e o povoa com dados sintéticos: cerca de 300 Products, 40 Coupons, 1.000 Shoppers, 1.500 Carts nos cinco status e 700 Orders, com datas espalhadas pelos últimos meses. Carts e Orders passam pelo Service de carts, então seguem as mesmas regras da API. A semente é fixa: cada execução recria o mesmo estado, relativo ao instante em que roda. Roda num container (serviço `seed`, depois do `migrate`), funciona com `make up` ou `make dev` de pé e se recusa a rodar no `ecommerce_test`. Nenhum teste depende desses dados. O que é gerado, os casos de borda, os códigos dos Coupons ([Coupons para testar](docs/seeds-report.md#coupons-para-testar)) e como assumir um Shopper de demonstração no navegador estão em [`docs/seeds-report.md`](docs/seeds-report.md).
 
 ## Desenvolvimento (`make dev`)
 
