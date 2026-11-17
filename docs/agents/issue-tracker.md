@@ -7,7 +7,7 @@ Specs and tickets for this repo live as markdown files in `docs/`, committed wit
 - One feature per directory: `docs/<feature-slug>/` (e.g. `docs/carrinho/`).
 - **Spec** (from `/to-spec`): `docs/<feature-slug>/frd-<feature-slug>.md`.
 - **Blueprint** (from `/to-tickets`): `docs/<feature-slug>/blueprint-<feature-slug>.md`, an index of the approved breakdown: each ticket's number, title, "Blocked by" and a link to its file.
-- **Tickets**: one file per ticket at `docs/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` in dependency order, never a single combined file.
+- **Tickets**: one file per ticket at `docs/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` in dependency order, never a single combined file. The `**Spec:**` line links the spec and names the spec sections the ticket depends on (`**Spec:** [FRD do Carrinho](../frd-carrinho.md): Order; Contrato da API`), so the implementer reads those sections instead of the whole spec.
 - **Scaffolding exception**: the spec is `docs/scaffolding-specification.md` and the blueprint is `docs/scaffolding-blueprint.md` (repo `docs/` root); its tickets go in `docs/scaffolding/issues/`.
 - Triage state is a `Status:` line near the top of each ticket (see `triage-labels.md`). A closed ticket has `Status: resolved`, which is not a triage role.
 - Comments append to the bottom of the file under a `## Comments` heading.

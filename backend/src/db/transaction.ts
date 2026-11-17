@@ -16,7 +16,7 @@ export type TransactionalRepositories = {
 /**
  * Runs `work` in one database transaction: it commits when `work` resolves and rolls back
  * everything when it throws, so a Service can undo several Repositories' writes by raising
- * a domain error.
+ * a domain error (ADR 0010).
  */
 export type InTransaction = <T>(
   work: (repositories: TransactionalRepositories) => Promise<T>,

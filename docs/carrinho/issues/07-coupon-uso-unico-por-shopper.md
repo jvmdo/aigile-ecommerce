@@ -1,6 +1,6 @@
 # 07: Coupon de uso único por Shopper
 
-**Spec:** [FRD do Carrinho](../frd-carrinho.md)
+**Spec:** [FRD do Carrinho](../frd-carrinho.md): Regras do Coupon; Confirmação (ADR 0009); Banco de dados; Erros de domínio; Testing Decisions
 
 **What to build:** cada Shopper usa um mesmo Coupon em no máximo um Order. Ao tentar aplicar um Coupon que já usou, o Shopper vê que ele já foi usado. Mesmo que dois Carts do mesmo Shopper tentem confirmar com o mesmo Coupon ao mesmo tempo, só um Order é criado. Outro Shopper continua podendo usar o mesmo Coupon.
 

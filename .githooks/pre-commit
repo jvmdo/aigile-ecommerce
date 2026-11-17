@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs `npm run check` (typecheck of every workspace and Biome) before each commit.
+# Installed by `npm install` (root `prepare` script sets core.hooksPath to .githooks).
+exec npm run check --silent

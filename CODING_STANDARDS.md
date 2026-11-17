@@ -8,6 +8,7 @@ Judgement-call rules for reviewers. Anything a tool can enforce (formatting, lin
 - **Service** holds business rules. It knows nothing about HTTP (no request/reply objects, no status codes) and reaches the database only through a Repository.
 - **Repository** wraps Drizzle and returns plain domain data. No business rules, no HTTP.
 - Code is grouped by feature (one folder per feature with its Controller, Service and Repository), not by layer.
+- A Service that writes through several Repositories atomically uses `InTransaction` (ADR 0010).
 - Dependencies (database connection, config) are passed in when the app is built, never imported as module-level singletons, so tests can supply the test database.
 
 ## Errors
@@ -19,6 +20,7 @@ Judgement-call rules for reviewers. Anything a tool can enforce (formatting, lin
 ## Contracts
 
 - Route request/response schemas live only in the `shared` package. Backend and frontend import them; neither redefines an API shape locally.
+- Types that mirror a contract shape (error `details`, Cart or Order items, money fields) are aliases or `Pick`s of the `shared` types, not local copies with the same fields.
 
 ## Frontend layers
 
@@ -34,5 +36,5 @@ Judgement-call rules for reviewers. Anything a tool can enforce (formatting, lin
 
 ## Tests
 
-- Test only at the seams agreed in the spec. Assert observable behaviour; never mock internal collaborators or query the database to verify what the API already returns.
+- Test only at the seams agreed in the spec. Assert observable behaviour; never mock internal collaborators or query the database to verify what the API already returns. Querying the database is fine for state the API does not expose (e.g. that no Order was created, since there is no Order listing).
 - Expected values come from literals or the spec, never recomputed the way the code computes them.

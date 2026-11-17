@@ -1,6 +1,6 @@
 # 08: Abandono do Cart
 
-**Spec:** [FRD do Carrinho](../frd-carrinho.md)
+**Spec:** [FRD do Carrinho](../frd-carrinho.md): Identidade do Shopper; Máquina de estados do Cart; Abandono por tempo; Frontend; Testing Decisions
 
 **What to build:** o Shopper pode abandonar o Cart explicitamente. Um Cart Com Itens ou Em Checkout sem nenhuma alteração por 24 horas passa a Abandonado na próxima vez que for acessado, sem job agendado. Quando o Shopper volta a um Cart abandonado, vê que ele expirou e começa um Cart novo na próxima adição. Um Cart Vazio nunca é abandonado.
 

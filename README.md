@@ -93,9 +93,10 @@ Os testes E2E (Playwright, imagem oficial `mcr.microsoft.com/playwright`) sobem 
 | `make test` | Suíte completa (unidade, integração e E2E) em containers; falha se qualquer nível falhar. |
 | `make test-unit` | Testes de unidade do Domain do frontend (formatação de preço, regra de "Esgotado", validação de quantidade, mensagens por código de erro), em container. |
 | `make test-integration` | Testes de integração do backend contra o database `ecommerce_test`, que é migrado e limpo a cada execução, em containers. |
+| `make test-integration-host` | Os mesmos testes de integração, mas no host contra o Postgres do compose, sem rebuild de imagem: o ciclo rápido durante o desenvolvimento. `FILE=test/integration/orders.test.ts` roda um só arquivo. Exige Node 24 e `npm install`. |
 | `make test-e2e` | Testes E2E com Playwright contra uma stack compose isolada, pelo nginx; remove essa stack ao final. |
 | `make dev` | Postgres em container, migrations aplicadas, backend e Vite com recarga automática no host (veja acima). Exige Node 24 e `npm install`. |
-| `make check` | `tsc --noEmit` em todos os workspaces e Biome. Exige Node 24 no host e `npm install`. |
+| `make check` | `tsc --noEmit` em todos os workspaces e Biome. Exige Node 24 no host e `npm install`. O `npm install` também instala o hook de pre-commit (`.githooks/pre-commit`), que roda essa mesma verificação antes de cada commit. |
 
 O database `ecommerce_test` é criado na primeira inicialização do volume do Postgres. Se o volume já existia antes disso, recrie-o com `docker compose down -v` (apaga os dados locais).
 
