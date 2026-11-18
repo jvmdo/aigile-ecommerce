@@ -1,7 +1,11 @@
 // Fills the application database with synthetic data for demonstration (`make seed`).
 // Everything already there (Products, Coupons, Carts, Orders) is deleted first.
+// With --if-empty (the seed-initial service of `docker compose up`), it only seeds a database
+// that has no Products yet, and otherwise leaves everything as it is.
 import { createDatabase } from "../src/db/connection.ts";
-import { seedDatabase } from "./seed/seed-database.ts";
+import { seedDatabase, seedDatabaseIfEmpty } from "./seed/seed-database.ts";
+
+const onlyIfEmpty = process.argv.includes("--if-empty");
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -18,10 +22,17 @@ if (databaseName === "ecommerce_test") {
 const database = createDatabase(databaseUrl);
 const startedAt = performance.now();
 try {
-  const { counts } = await seedDatabase(database.db, { now: new Date() });
-  const seconds = ((performance.now() - startedAt) / 1000).toFixed(1);
-  console.log(`Seed concluído em ${seconds}s no database ${databaseName}:`);
-  console.log(JSON.stringify(counts, null, 2));
+  const options = { now: new Date() };
+  const summary = onlyIfEmpty
+    ? await seedDatabaseIfEmpty(database.db, options)
+    : await seedDatabase(database.db, options);
+  if (summary === null) {
+    console.log(`O database ${databaseName} já tem Products: seed inicial ignorado.`);
+  } else {
+    const seconds = ((performance.now() - startedAt) / 1000).toFixed(1);
+    console.log(`Seed concluído em ${seconds}s no database ${databaseName}:`);
+    console.log(JSON.stringify(summary.counts, null, 2));
+  }
 } catch (error) {
   console.error(error);
   process.exitCode = 1;

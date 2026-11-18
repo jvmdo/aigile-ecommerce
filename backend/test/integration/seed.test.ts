@@ -2,10 +2,10 @@ import type { Cart, Product } from "@aigile/shared";
 import { count, isNotNull, isNull, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { demoShoppers } from "../../scripts/seed/demo-shoppers.ts";
-import { seedDatabase } from "../../scripts/seed/seed-database.ts";
+import { seedDatabase, seedDatabaseIfEmpty } from "../../scripts/seed/seed-database.ts";
 import { buildApp } from "../../src/app.ts";
 import { createDatabase } from "../../src/db/connection.ts";
-import { carts, orders } from "../../src/db/schema.ts";
+import { carts, orders, products } from "../../src/db/schema.ts";
 import { createTestClock } from "../support/test-clock.ts";
 import { requireTestDatabaseUrl } from "../support/test-database-url.ts";
 
@@ -190,5 +190,31 @@ describe("seed", () => {
       expect(again.counts).toEqual(summary.counts);
       expect((await getCart(demoShoppers.empty.cartId)).statusCode).toBe(200);
     }, 120_000);
+  });
+  // Runs last: it empties the database the blocks above read.
+  describe("only when the database has no Products (first docker compose up)", () => {
+    async function productCount(): Promise<number> {
+      const [row] = await database.db.select({ value: count() }).from(products);
+      return row?.value ?? 0;
+    }
+
+    it("skips, changing nothing, when there are Products", async () => {
+      const before = await productCount();
+
+      const summary = await seedDatabaseIfEmpty(database.db, { now: SEEDED_AT, size: SIZE });
+
+      expect(summary).toBeNull();
+      expect(before).toBe(40);
+      expect(await productCount()).toBe(40);
+    });
+
+    it("seeds an empty database", async () => {
+      await database.db.execute(sql`TRUNCATE orders, carts, products, coupons CASCADE`);
+
+      const summary = await seedDatabaseIfEmpty(database.db, { now: SEEDED_AT, size: SIZE });
+
+      expect(summary?.counts.products).toBe(40);
+      expect(await productCount()).toBe(40);
+    }, 60_000);
   });
 });

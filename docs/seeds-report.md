@@ -1,8 +1,12 @@
 # Relatório de seeds
 
-Passo 7 do projeto (dados sintéticos). Ticket: [docs/seeds/issues/01-seed.md](seeds/issues/01-seed.md).
+Passo 7 do projeto (dados sintéticos). Tickets: [01, o seed](seeds/issues/01-seed.md) e [02, o seed inicial no `docker compose up`](seeds/issues/02-seed-inicial-no-compose-up.md).
 
 ## Como gerar
+
+A primeira subida da stack já gera os dados: o serviço `seed-initial` do compose roda depois do `migrate` e antes da API e povoa o banco **só se ele ainda não tem Products**. Assim, `docker compose up` num clone limpo mostra o catálogo do seed sem nenhum passo manual (critério 2 de entrega do curso), e as subidas seguintes não apagam nada. A stack E2E desliga esse serviço, porque cada teste insere os próprios dados.
+
+Para recriar os dados de propósito:
 
 ```sh
 make seed

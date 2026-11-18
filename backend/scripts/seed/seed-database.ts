@@ -52,6 +52,22 @@ const FAKER_SEED = 20261117;
 const CONCURRENCY = 8;
 
 /**
+ * Seeds only a database with no Products yet, as on the first `docker compose up` of a fresh
+ * clone; returns null, changing nothing, when there are Products. Later `up`s keep the data,
+ * and `make seed` stays the way to recreate it.
+ */
+export async function seedDatabaseIfEmpty(
+  db: Database,
+  options: SeedOptions,
+): Promise<SeedSummary | null> {
+  const [row] = await db.select({ value: count() }).from(productsTable);
+  if ((row?.value ?? 0) > 0) {
+    return null;
+  }
+  return seedDatabase(db, options);
+}
+
+/**
  * Empties the Products, Coupons, Carts and Orders and fills them with synthetic data: the
  * catalog and the Coupons are inserted directly (they have no API), and every Cart and Order
  * goes through the Cart Service with a clock set to each step's instant, so they follow the

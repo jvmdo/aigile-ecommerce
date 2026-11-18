@@ -52,6 +52,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      seed-initial:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD
@@ -78,6 +80,23 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # The demonstration data on the first `docker compose up`: seeds only a database with no
+  # Products yet, so a fresh clone shows the seeded catalog and later `up`s keep their data.
+  seed-initial:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: seed
+    command: ["node", "scripts/seed.ts", "--if-empty"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-ecommerce}:${POSTGRES_PASSWORD:-ecommerce}@db:5432/${POSTGRES_DB:-ecommerce}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
 
   # Synthetic data for demonstration, only on `make seed`: deletes and recreates every
   # Product, Coupon, Cart and Order of the application database.

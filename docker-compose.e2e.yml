@@ -17,6 +17,10 @@ services:
   web:
     ports: !reset []
 
+  # Each E2E test inserts the data it needs; the demonstration seed would only get in the way.
+  seed-initial:
+    command: ["node", "-e", "console.log('Stack E2E: sem seed inicial.')"]
+
   test-e2e:
     profiles: ["test"]
     build:
