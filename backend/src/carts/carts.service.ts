@@ -9,6 +9,7 @@ import {
 import type { Clock } from "../clock.ts";
 import type { InTransaction, TransactionalRepositories } from "../db/transaction.ts";
 import { DomainError } from "../domain-error.ts";
+import { lineTotalCents } from "../money.ts";
 import type { OrdersService } from "../orders/orders.service.ts";
 import type { ProductsRepository } from "../products/products.repository.ts";
 import { type CartAction, allows, invalidTransition, nextStatus } from "./cart-transitions.ts";
@@ -336,7 +337,7 @@ function toCart(record: CartRecord): Cart {
     name: item.name,
     unitPriceCents: item.unitPriceCents,
     quantity: item.quantity,
-    lineTotalCents: item.quantity * item.unitPriceCents,
+    lineTotalCents: lineTotalCents(item),
   }));
   const subtotalCents = items.reduce((sum, item) => sum + item.lineTotalCents, 0);
   const coupon = record.coupon;

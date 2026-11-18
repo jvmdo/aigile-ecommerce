@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Uma função de domínio no backend calcula `lineTotalCents`; [carts.service.ts](../../../backend/src/carts/carts.service.ts) e [orders.service.ts](../../../backend/src/orders/orders.service.ts) a usam.
-- [ ] Nenhum comportamento muda: `make test` verde sem alterar testes.
+- [x] Uma função de domínio no backend calcula `lineTotalCents`; [carts.service.ts](../../../backend/src/carts/carts.service.ts) e [orders.service.ts](../../../backend/src/orders/orders.service.ts) a usam.
+- [x] Nenhum comportamento muda: `make test` verde sem alterar testes.

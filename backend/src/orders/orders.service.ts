@@ -1,5 +1,6 @@
 import type { Order } from "@aigile/shared";
 import { DomainError } from "../domain-error.ts";
+import { lineTotalCents } from "../money.ts";
 import type { OrdersRepository } from "./orders.repository.ts";
 
 export type OrdersService = {
@@ -20,7 +21,7 @@ export function createOrdersService(orders: OrdersRepository): OrdersService {
         status: order.status,
         items: order.items.map((item) => ({
           ...item,
-          lineTotalCents: item.quantity * item.unitPriceCents,
+          lineTotalCents: lineTotalCents(item),
         })),
         coupon: order.coupon,
         subtotalCents: order.subtotalCents,
