@@ -1264,6 +1264,58 @@ describe("Carts API", () => {
     });
   });
 
+  // Each request reads the Cart again under its lock before deciding, so two at once on the
+  // same Cart behave as if they ran one after the other (review R1 and R2).
+  describe("concurrent item changes on one Cart", () => {
+    it("empties the Cart and drops its Coupon when its two items are removed at once", async () => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 12 });
+      const vaseId = await insertProduct({ name: "Vaso de Barro", priceCents: 5000, stock: 10 });
+      await addItem(cartId, { productId: mugId, quantity: 1 });
+      await addItem(cartId, { productId: vaseId, quantity: 1 });
+      await insertCoupon({ code: "DEZ", type: "percentage", value: 10 });
+      await applyCoupon(cartId, { code: "DEZ" });
+
+      const responses = await Promise.all([removeItem(cartId, mugId), removeItem(cartId, vaseId)]);
+
+      expect(responses.map((response) => response.statusCode)).toEqual([200, 200]);
+      const cart = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+      expect(cart.json()).toMatchObject({ status: "empty", items: [], coupon: null });
+    });
+
+    it("refuses the second of two additions whose sum exceeds the Stock", async () => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 5 });
+
+      const responses = await Promise.all([
+        addItem(cartId, { productId: mugId, quantity: 3 }),
+        addItem(cartId, { productId: mugId, quantity: 3 }),
+      ]);
+
+      expect(responses.map((response) => response.statusCode).sort()).toEqual([200, 409]);
+      const refused = responses.find((response) => response.statusCode === 409);
+      expect(refused?.json()).toMatchObject({ error: { code: "INSUFFICIENT_STOCK" } });
+      const cart = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+      expect(cart.json()).toMatchObject({ items: [{ productId: mugId, quantity: 3 }] });
+    });
+
+    it("refuses the second of two additions whose sum exceeds 99 units", async () => {
+      const cartId = await createCart();
+      const mugId = await insertProduct({ name: "Caneca Esmaltada", priceCents: 3990, stock: 500 });
+
+      const responses = await Promise.all([
+        addItem(cartId, { productId: mugId, quantity: 60 }),
+        addItem(cartId, { productId: mugId, quantity: 60 }),
+      ]);
+
+      expect(responses.map((response) => response.statusCode).sort()).toEqual([200, 422]);
+      const refused = responses.find((response) => response.statusCode === 422);
+      expect(refused?.json()).toMatchObject({ error: { code: "QUANTITY_LIMIT_EXCEEDED" } });
+      const cart = await app.inject({ method: "GET", url: `/api/carts/${cartId}` });
+      expect(cart.json()).toMatchObject({ items: [{ productId: mugId, quantity: 60 }] });
+    });
+  });
+
   async function insertCoupon(coupon: {
     code: string;
     type: CouponType;

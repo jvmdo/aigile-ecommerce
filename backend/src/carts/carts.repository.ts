@@ -36,6 +36,11 @@ export type CartsRepository = {
   /** The Cart with its items in the order they entered it, or null when it does not exist. */
   findById: (id: string) => Promise<CartRecord | null>;
   /**
+   * Like `findById`, but also locks the Cart's row until the transaction ends, so concurrent
+   * requests about the same Cart wait for each other. Run it inside `InTransaction`.
+   */
+  findByIdForUpdate: (id: string) => Promise<CartRecord | null>;
+  /**
    * Inserts the Cart Item, or adds `quantity` to the existing one for that Product (keeping
    * the unit price it entered with), and records the Cart's new status and last change, in
    * one transaction. The increment happens in SQL so concurrent additions are not lost.
@@ -84,6 +89,43 @@ export type NewCartItem = {
 };
 
 export function createCartsRepository(db: Queryable): CartsRepository {
+  async function findCart(id: string, forUpdate: boolean): Promise<CartRecord | null> {
+    const query = db
+      .select({
+        id: carts.id,
+        shopperId: carts.shopperId,
+        status: carts.status,
+        lastChangedAt: carts.lastChangedAt,
+        coupon: {
+          id: coupons.id,
+          code: coupons.code,
+          type: coupons.type,
+          value: coupons.value,
+          expiresAt: coupons.expiresAt,
+        },
+      })
+      .from(carts)
+      .leftJoin(coupons, eq(coupons.id, carts.couponId))
+      .where(eq(carts.id, id));
+    // Only the Cart's row is locked: the Coupon is on the nullable side of the join.
+    const [row] = await (forUpdate ? query.for("update", { of: carts }) : query);
+    if (row === undefined) {
+      return null;
+    }
+    const items = await db
+      .select({
+        productId: cartItems.productId,
+        name: products.name,
+        unitPriceCents: cartItems.unitPriceCents,
+        quantity: cartItems.quantity,
+      })
+      .from(cartItems)
+      .innerJoin(products, eq(products.id, cartItems.productId))
+      .where(eq(cartItems.cartId, id))
+      .orderBy(asc(cartItems.insertionOrder));
+    return { ...row, items };
+  }
+
   return {
     create: async (shopperId, now) => {
       const [row] = await db
@@ -96,40 +138,9 @@ export function createCartsRepository(db: Queryable): CartsRepository {
       return row.id;
     },
 
-    findById: async (id) => {
-      const [row] = await db
-        .select({
-          id: carts.id,
-          shopperId: carts.shopperId,
-          status: carts.status,
-          lastChangedAt: carts.lastChangedAt,
-          coupon: {
-            id: coupons.id,
-            code: coupons.code,
-            type: coupons.type,
-            value: coupons.value,
-            expiresAt: coupons.expiresAt,
-          },
-        })
-        .from(carts)
-        .leftJoin(coupons, eq(coupons.id, carts.couponId))
-        .where(eq(carts.id, id));
-      if (row === undefined) {
-        return null;
-      }
-      const items = await db
-        .select({
-          productId: cartItems.productId,
-          name: products.name,
-          unitPriceCents: cartItems.unitPriceCents,
-          quantity: cartItems.quantity,
-        })
-        .from(cartItems)
-        .innerJoin(products, eq(products.id, cartItems.productId))
-        .where(eq(cartItems.cartId, id))
-        .orderBy(asc(cartItems.insertionOrder));
-      return { ...row, items };
-    },
+    findById: (id) => findCart(id, false),
+
+    findByIdForUpdate: (id) => findCart(id, true),
 
     // Each transaction updates the Cart row first: the conditional update checks the status
     // and locks the row, so concurrent mutations of one Cart run one after the other.

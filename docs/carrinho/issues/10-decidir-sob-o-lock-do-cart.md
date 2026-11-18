@@ -6,10 +6,14 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] O Repository do Cart ganha uma leitura que trava a linha do Cart até o fim da transação; adicionar, alterar e remover um Cart Item leem o Cart por ela, dentro de `InTransaction`, e decidem as regras sobre essa leitura.
-- [ ] Duas remoções concorrentes dos dois Cart Items de um Cart com Coupon terminam com o Cart `empty`, sem itens e sem Coupon.
-- [ ] Duas adições concorrentes do mesmo Product cuja soma passa do Estoque: uma responde `200`, a outra `409 INSUFFICIENT_STOCK`, e a quantidade final não passa do Estoque.
-- [ ] Duas adições concorrentes do mesmo Product cuja soma passa de 99: uma responde `200`, a outra `422 QUANTITY_LIMIT_EXCEEDED`, e a quantidade final não passa de 99.
-- [ ] Testes de integração na seam do app HTTP para os três cenários de corrida acima; os testes existentes continuam verdes.
+- [x] O Repository do Cart ganha uma leitura que trava a linha do Cart até o fim da transação; adicionar, alterar e remover um Cart Item leem o Cart por ela, dentro de `InTransaction`, e decidem as regras sobre essa leitura.
+- [x] Duas remoções concorrentes dos dois Cart Items de um Cart com Coupon terminam com o Cart `empty`, sem itens e sem Coupon.
+- [x] Duas adições concorrentes do mesmo Product cuja soma passa do Estoque: uma responde `200`, a outra `409 INSUFFICIENT_STOCK`, e a quantidade final não passa do Estoque.
+- [x] Duas adições concorrentes do mesmo Product cuja soma passa de 99: uma responde `200`, a outra `422 QUANTITY_LIMIT_EXCEEDED`, e a quantidade final não passa de 99.
+- [x] Testes de integração na seam do app HTTP para os três cenários de corrida acima; os testes existentes continuam verdes.
+
+## Comments
+
+- Antes da correção, os dois testes de adições concorrentes falhavam (o segundo pedido recebia `409 INVALID_CART_TRANSITION` num Cart que começou `empty`, outro efeito da mesma leitura antiga). O teste das duas remoções passou mesmo antes da correção em 10 execuções seguidas: nesta máquina as duas leituras não chegam a se intercalar. Ele fica como teste de regressão do comportamento esperado, e a correção de R1 se apoia no mesmo lock que fez os testes de adição passarem.

@@ -7,7 +7,7 @@ import {
   type Product,
 } from "@aigile/shared";
 import type { Clock } from "../clock.ts";
-import type { InTransaction } from "../db/transaction.ts";
+import type { InTransaction, TransactionalRepositories } from "../db/transaction.ts";
 import { DomainError } from "../domain-error.ts";
 import type { OrdersService } from "../orders/orders.service.ts";
 import type { ProductsRepository } from "../products/products.repository.ts";
@@ -68,60 +68,64 @@ export function createCartsService({
     getCart: async (id) => toCart(await findCartAbandoningIfIdle(id)),
 
     addItem: async (cartId, { productId, quantity }) => {
-      const cart = await findCartAbandoningIfIdle(cartId);
-      const status = nextStatus(cart.status, "addItem");
-      const product = await products.findById(productId);
-      if (product === null) {
-        throw new DomainError("PRODUCT_NOT_FOUND", "Produto não encontrado.");
-      }
-      const existing = cart.items.find((item) => item.productId === productId);
-      const resultingQuantity = (existing?.quantity ?? 0) + quantity;
-      if (resultingQuantity > MAX_ITEM_QUANTITY) {
-        throw new DomainError(
-          "QUANTITY_LIMIT_EXCEEDED",
-          `A quantidade de um produto no carrinho não pode passar de ${MAX_ITEM_QUANTITY}.`,
+      await findCartAbandoningIfIdle(cartId);
+      await underLock(cartId, async (tx, cart) => {
+        const status = nextStatus(cart.status, "addItem");
+        const product = await tx.products.findById(productId);
+        if (product === null) {
+          throw new DomainError("PRODUCT_NOT_FOUND", "Produto não encontrado.");
+        }
+        const existing = cart.items.find((item) => item.productId === productId);
+        const resultingQuantity = (existing?.quantity ?? 0) + quantity;
+        if (resultingQuantity > MAX_ITEM_QUANTITY) {
+          throw new DomainError(
+            "QUANTITY_LIMIT_EXCEEDED",
+            `A quantidade de um produto no carrinho não pode passar de ${MAX_ITEM_QUANTITY}.`,
+          );
+        }
+        assertInStock(product, resultingQuantity);
+        return tx.carts.addItem(
+          { cartId, productId, quantity, unitPriceCents: product.priceCents },
+          { from: cart.status, status, changedAt: clock.now() },
         );
-      }
-      assertInStock(product, resultingQuantity);
-      const written = await carts.addItem(
-        { cartId, productId, quantity, unitPriceCents: product.priceCents },
-        { from: cart.status, status, changedAt: clock.now() },
-      );
-      await assertWritten(written, cartId);
+      });
       return toCart(await findCart(carts, cartId));
     },
 
     updateItemQuantity: async (cartId, productId, quantity) => {
-      const cart = await findCartAbandoningIfIdle(cartId);
-      const status = nextStatus(cart.status, "updateItemQuantity");
-      assertInCart(cart, productId);
-      const product = await products.findById(productId);
-      if (product === null) {
-        // A Cart Item always references an existing Product (foreign key).
-        throw new Error(`Product ${productId} of a Cart Item does not exist`);
-      }
-      assertInStock(product, quantity);
-      const written = await carts.updateItemQuantity({ cartId, productId }, quantity, {
-        from: cart.status,
-        status,
-        changedAt: clock.now(),
+      await findCartAbandoningIfIdle(cartId);
+      await underLock(cartId, async (tx, cart) => {
+        const status = nextStatus(cart.status, "updateItemQuantity");
+        assertInCart(cart, productId);
+        const product = await tx.products.findById(productId);
+        if (product === null) {
+          // A Cart Item always references an existing Product (foreign key).
+          throw new Error(`Product ${productId} of a Cart Item does not exist`);
+        }
+        assertInStock(product, quantity);
+        return tx.carts.updateItemQuantity({ cartId, productId }, quantity, {
+          from: cart.status,
+          status,
+          changedAt: clock.now(),
+        });
       });
-      await assertWritten(written, cartId);
       return toCart(await findCart(carts, cartId));
     },
 
     removeItem: async (cartId, productId) => {
-      const cart = await findCartAbandoningIfIdle(cartId);
-      const removesLastItem = cart.items.length === 1 && cart.items[0]?.productId === productId;
-      const action: CartAction = removesLastItem ? "removeLastItem" : "removeItem";
-      const status = nextStatus(cart.status, action);
-      assertInCart(cart, productId);
-      const change: CartChange = { from: cart.status, status, changedAt: clock.now() };
-      if (removesLastItem) {
-        // An empty Cart never carries a Coupon (FRD, "Cart Items").
-        change.couponId = null;
-      }
-      await assertWritten(await carts.removeItem({ cartId, productId }, change), cartId);
+      await findCartAbandoningIfIdle(cartId);
+      await underLock(cartId, async (tx, cart) => {
+        const removesLastItem = cart.items.length === 1 && cart.items[0]?.productId === productId;
+        const action: CartAction = removesLastItem ? "removeLastItem" : "removeItem";
+        const status = nextStatus(cart.status, action);
+        assertInCart(cart, productId);
+        const change: CartChange = { from: cart.status, status, changedAt: clock.now() };
+        if (removesLastItem) {
+          // An empty Cart never carries a Coupon (FRD, "Cart Items").
+          change.couponId = null;
+        }
+        return tx.carts.removeItem({ cartId, productId }, change);
+      });
       return toCart(await findCart(carts, cartId));
     },
 
@@ -240,6 +244,27 @@ export function createCartsService({
       changedAt: now,
     });
     return findCart(carts, cartId);
+  }
+
+  /**
+   * Runs `decide` on the Cart read again under its row lock, in one transaction, so the rules
+   * it checks (last item, 99 units, Stock) hold against concurrent requests on the same Cart:
+   * they wait for the lock and then see this one's write (review R1 and R2). `decide` returns
+   * whether its conditional write happened; under the lock it always should.
+   */
+  async function underLock(
+    cartId: string,
+    decide: (tx: TransactionalRepositories, cart: CartRecord) => Promise<boolean>,
+  ): Promise<void> {
+    await inTransaction(async (tx) => {
+      const cart = await tx.carts.findByIdForUpdate(cartId);
+      if (cart === null) {
+        throw new DomainError("CART_NOT_FOUND", "Carrinho não encontrado.");
+      }
+      if (!(await decide(tx, cart))) {
+        throw invalidTransition((await findCart(tx.carts, cartId)).status);
+      }
+    });
   }
 
   /** Moves the Cart along the table for an action that touches nothing but its status. */
