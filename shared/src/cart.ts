@@ -1,4 +1,5 @@
 import { type Static, Type } from "@sinclair/typebox";
+import { Uuid } from "./uuid.ts";
 
 /** The most units of one Product a Cart Item can hold (FRD, "Cart Items"). */
 export const MAX_ITEM_QUANTITY = 99;
@@ -18,7 +19,7 @@ export type CartStatus = Static<typeof CartStatus>;
 
 /** A Cart Item as the API returns it. The name is the Product's current one; the unit price is fixed when it entered the Cart. */
 export const CartItem = Type.Object({
-  productId: Type.String({ format: "uuid" }),
+  productId: Uuid,
   name: Type.String(),
   unitPriceCents: Type.Integer({ minimum: 0 }),
   quantity: Type.Integer({ minimum: 1, maximum: MAX_ITEM_QUANTITY }),
@@ -48,7 +49,7 @@ export type AppliedCoupon = Static<typeof AppliedCoupon>;
 
 /** The full Cart every Cart route returns. Money is integer cents computed by the server (ADR 0005). */
 export const Cart = Type.Object({
-  id: Type.String({ format: "uuid" }),
+  id: Uuid,
   status: CartStatus,
   /** Ordered by when each Product entered the Cart. */
   items: Type.Array(CartItem),
@@ -62,29 +63,29 @@ export type Cart = Static<typeof Cart>;
 
 /** Path parameters of every `/api/carts/:id` route. */
 export const CartParams = Type.Object({
-  id: Type.String({ format: "uuid" }),
+  id: Uuid,
 });
 
 export type CartParams = Static<typeof CartParams>;
 
 /** Path parameters of every `/api/carts/:id/items/:productId` route. */
 export const CartItemParams = Type.Object({
-  id: Type.String({ format: "uuid" }),
-  productId: Type.String({ format: "uuid" }),
+  id: Uuid,
+  productId: Uuid,
 });
 
 export type CartItemParams = Static<typeof CartItemParams>;
 
 /** `POST /api/carts`: creates an empty Cart for the Shopper. */
 export const CreateCartBody = Type.Object({
-  shopperId: Type.String({ format: "uuid" }),
+  shopperId: Uuid,
 });
 
 export type CreateCartBody = Static<typeof CreateCartBody>;
 
 /** `POST /api/carts/:id/items`: adds a Product, or adds to the quantity of its Cart Item. */
 export const AddCartItemBody = Type.Object({
-  productId: Type.String({ format: "uuid" }),
+  productId: Uuid,
   quantity: Type.Integer({ minimum: 1, maximum: MAX_ITEM_QUANTITY }),
 });
 

@@ -1316,6 +1316,24 @@ describe("Carts API", () => {
     });
   });
 
+  // The urn:uuid: form passes a loose uuid check but not PostgreSQL; the route schema refuses
+  // it before it reaches the database (security report, S4).
+  describe("ids in the urn:uuid: form", () => {
+    const urn = `urn:uuid:${UNKNOWN_CART_ID}`;
+
+    it.each([
+      { method: "GET", url: `/api/carts/${urn}` },
+      { method: "DELETE", url: `/api/carts/${UNKNOWN_CART_ID}/items/${urn}` },
+      { method: "POST", url: "/api/carts", payload: { shopperId: urn } },
+      { method: "GET", url: `/api/orders/${urn}` },
+    ] as const)("$method $url responds 400 VALIDATION_ERROR", async (request) => {
+      const response = await app.inject(request);
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ error: { code: "VALIDATION_ERROR" } });
+    });
+  });
+
   async function insertCoupon(coupon: {
     code: string;
     type: CouponType;

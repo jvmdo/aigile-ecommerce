@@ -1,5 +1,6 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { AppliedCoupon, MAX_ITEM_QUANTITY } from "./cart.ts";
+import { Uuid } from "./uuid.ts";
 
 /** Order Status values. An Order is only ever created for now (FRD, "Order"). */
 export const orderStatuses = ["created"] as const;
@@ -10,7 +11,7 @@ export type OrderStatus = Static<typeof OrderStatus>;
 
 /** An Order Item as the API returns it: copied from a Cart Item; the name is the Product's current one. */
 export const OrderItem = Type.Object({
-  productId: Type.String({ format: "uuid" }),
+  productId: Uuid,
   name: Type.String(),
   unitPriceCents: Type.Integer({ minimum: 0 }),
   quantity: Type.Integer({ minimum: 1, maximum: MAX_ITEM_QUANTITY }),
@@ -24,7 +25,7 @@ export type OrderItem = Static<typeof OrderItem>;
  * and Coupon are copies taken at confirmation: later changes to the Coupon do not alter it.
  */
 export const Order = Type.Object({
-  id: Type.String({ format: "uuid" }),
+  id: Uuid,
   status: OrderStatus,
   items: Type.Array(OrderItem),
   coupon: Type.Union([AppliedCoupon, Type.Null()]),
@@ -38,7 +39,7 @@ export type Order = Static<typeof Order>;
 
 /** Path parameters of `/api/orders/:id`. */
 export const OrderParams = Type.Object({
-  id: Type.String({ format: "uuid" }),
+  id: Uuid,
 });
 
 export type OrderParams = Static<typeof OrderParams>;

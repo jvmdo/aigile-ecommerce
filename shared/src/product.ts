@@ -1,8 +1,9 @@
 import { type Static, Type } from "@sinclair/typebox";
+import { Uuid } from "./uuid.ts";
 
 /** A Product as the API returns it. Money is integer cents (ADR 0005); ids are UUIDs (ADR 0006). */
 export const Product = Type.Object({
-  id: Type.String({ format: "uuid" }),
+  id: Uuid,
   name: Type.String(),
   description: Type.String(),
   priceCents: Type.Integer({ minimum: 0 }),

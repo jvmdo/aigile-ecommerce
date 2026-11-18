@@ -6,8 +6,8 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Um único schema de UUID no `shared`, com o padrão hexadecimal 8-4-4-4-12, usado por todos os ids do contrato (Cart, Cart Item, Shopper, Product, Order).
-- [ ] Teste de integração: `urn:uuid:` no id do Cart, no id do Product do caminho, no `shopperId` do corpo e no id do Order → `400 VALIDATION_ERROR`.
-- [ ] Os testes existentes continuam verdes.
+- [x] Um único schema de UUID no `shared`, com o padrão hexadecimal 8-4-4-4-12, usado por todos os ids do contrato (Cart, Cart Item, Shopper, Product, Order).
+- [x] Teste de integração: `urn:uuid:` no id do Cart, no id do Product do caminho, no `shopperId` do corpo e no id do Order → `400 VALIDATION_ERROR`.
+- [x] Os testes existentes continuam verdes.
