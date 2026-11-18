@@ -15,6 +15,9 @@ Quebra do [FRD do Carrinho](frd-carrinho.md) em tickets verticais (tracer bullet
 | 07 | [Coupon de uso único por Shopper](issues/07-coupon-uso-unico-por-shopper.md) | 06 | `COUPON_ALREADY_USED` ao aplicar e ao confirmar, índice único parcial |
 | 08 | [Abandono do Cart](issues/08-abandono.md) | 05 | Abandono explícito e por 24 h sob demanda, "Seu carrinho expirou" |
 | 09 | [Lacunas do E2E do Carrinho e relatório E2E](issues/09-lacunas-e2e.md) | — | Quatro testes E2E novos (Cart expirado, uso único do Coupon, navegador limpo, preço fixo) e `e2e-report-carrinho.md` |
+| 10 | [Alterações de itens decididas sob o lock do Cart](issues/10-decidir-sob-o-lock-do-cart.md) | — | Achados R1 e R2 da revisão: corridas entre alterações de itens |
+| 11 | [Tipos de item derivados do `shared`](issues/11-tipos-de-item-do-shared.md) | — | Achados R3 e R4 da revisão: `Pick`s do `shared` |
+| 12 | [Um único cálculo do total da linha](issues/12-line-total-unico.md) | — | Achado R5 da revisão |
 
 ## Grafo de dependências
 
@@ -28,6 +31,9 @@ graph LR
     T06 --> T07[07 Uso único]
     T05 --> T08[08 Abandono]
     T07 -.-> T09[09 Lacunas E2E]
+    T09 -.-> T10[10 Lock do Cart]
+    T09 -.-> T11[11 Tipos do shared]
+    T09 -.-> T12[12 Total da linha]
     T08 -.-> T09
 ```
 
@@ -43,6 +49,7 @@ Trabalha-se a **fronteira**: qualquer ticket cujos bloqueadores estejam concluí
 6. 06 e 08 (independentes entre si; qualquer ordem)
 7. 07 (depois de 06)
 8. 09 (acrescentado depois de 01–08 concluídos; por isso não tem bloqueador aberto)
+9. 10, 11 e 12 (acrescentados a partir da [revisão do carrinho](review-carrinho.md); independentes entre si)
 
 Cada ticket é implementado numa sessão limpa (`/clear` entre tickets), por TDD nas seams acordadas no FRD, terminando com um commit no `main` que fecha o ticket.
 
