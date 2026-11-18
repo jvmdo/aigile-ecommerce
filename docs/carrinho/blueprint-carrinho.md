@@ -18,6 +18,9 @@ Quebra do [FRD do Carrinho](frd-carrinho.md) em tickets verticais (tracer bullet
 | 10 | [Alterações de itens decididas sob o lock do Cart](issues/10-decidir-sob-o-lock-do-cart.md) | — | Achados R1 e R2 da revisão: corridas entre alterações de itens |
 | 11 | [Tipos de item derivados do `shared`](issues/11-tipos-de-item-do-shared.md) | — | Achados R3 e R4 da revisão: `Pick`s do `shared` |
 | 12 | [Um único cálculo do total da linha](issues/12-line-total-unico.md) | — | Achado R5 da revisão |
+| 13 | [Banco e API publicados só no localhost](issues/13-portas-so-no-localhost.md) | — | Achados S6 e S7 do relatório de segurança |
+| 14 | [UUID estrito no contrato](issues/14-uuid-estrito-no-contrato.md) | — | Achado S4 do relatório de segurança |
+| 15 | [Cabeçalhos de segurança no nginx](issues/15-cabecalhos-de-seguranca-no-nginx.md) | — | Achado S8 do relatório de segurança |
 
 ## Grafo de dependências
 
@@ -34,6 +37,9 @@ graph LR
     T09 -.-> T10[10 Lock do Cart]
     T09 -.-> T11[11 Tipos do shared]
     T09 -.-> T12[12 Total da linha]
+    T09 -.-> T13[13 Portas no localhost]
+    T09 -.-> T14[14 UUID estrito]
+    T09 -.-> T15[15 Cabeçalhos no nginx]
     T08 -.-> T09
 ```
 
@@ -50,6 +56,7 @@ Trabalha-se a **fronteira**: qualquer ticket cujos bloqueadores estejam concluí
 7. 07 (depois de 06)
 8. 09 (acrescentado depois de 01–08 concluídos; por isso não tem bloqueador aberto)
 9. 10, 11 e 12 (acrescentados a partir da [revisão do carrinho](review-carrinho.md); independentes entre si)
+10. 13, 14 e 15 (acrescentados a partir do [relatório de segurança](security-report-carrinho.md); independentes entre si)
 
 Cada ticket é implementado numa sessão limpa (`/clear` entre tickets), por TDD nas seams acordadas no FRD, terminando com um commit no `main` que fecha o ticket.
 
