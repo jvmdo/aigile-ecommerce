@@ -25,16 +25,18 @@ As seams e as regras do que é um bom teste estão no FRD, em "Testing Decisions
 
 ## A pirâmide
 
-Execução de `make test` em 18/11/2026, no commit `8646456`, depois das correções da [revisão](review-carrinho.md):
+Execução final de `make test` em 18/11/2026, num clone limpo do commit `beb7c39`, depois das correções da [revisão](review-carrinho.md) (Passo 5), do [relatório de segurança](security-report-carrinho.md) (Passo 9) e do seed inicial:
 
 | Camada | Seam do FRD | Arquivos | Testes | Resultado |
 | --- | --- | --- | --- | --- |
 | Unidade | 3. Domain do frontend | 7 | 31 | verde |
-| Integração | 1. App HTTP do backend | 7 | 130 | verde |
-| E2E | 2. Navegador contra a stack | 3 | 20 | verde (15,3 s) |
-| **Total** | | **17** | **181** | **verde, 62,6 s de ponta a ponta** |
+| Integração | 1. App HTTP do backend | 7 | 136 | verde |
+| E2E | 2. Navegador contra a stack | 3 | 21 | verde (13,5 s) |
+| **Total** | | **17** | **188** | **verde, 60,1 s de ponta a ponta** |
 
-Nem todos os testes são do Carrinho. Os 181 incluem o catálogo, o `/health`, o envelope de erro e o seed. Os do Carrinho estão detalhados abaixo.
+O Passo 6 contou 181 testes (no commit `8646456`). Os 7 a mais vieram depois: 4 de integração do ticket 14 (UUID estrito) e 1 E2E do ticket 15 (cabeçalhos de segurança), no Passo 9, e 2 de integração do seed inicial no `docker compose up` ([ticket 02 dos seeds](../seeds/issues/02-seed-inicial-no-compose-up.md)).
+
+Nem todos os testes são do Carrinho. Os 188 incluem o catálogo, o `/health`, o envelope de erro e o seed. Os do Carrinho estão detalhados abaixo.
 
 A pirâmide é mais larga no meio do que na base, de propósito. O FRD não abre seam para o Service, a máquina de estados ou o cálculo do Discount do backend: a seam de integração os alcança pela API, e testá-los isolados acoplaria os testes à estrutura interna. A base de unidade fica só com o Domain do frontend, que é feito de funções puras.
 
@@ -56,7 +58,7 @@ A pirâmide é mais larga no meio do que na base, de propósito. O FRD não abre
 
 [backend/test/integration/](../../backend/test/integration/), Vitest. O app é montado com `buildApp` e chamado por `inject()` do Fastify, contra o PostgreSQL real no database `ecommerce_test`, que é limpo antes de cada teste. Um relógio injetado controla a expiração dos Coupons e o abandono por 24 horas.
 
-### `carts.test.ts`: 86 testes
+### `carts.test.ts`: 90 testes
 
 | Bloco | Testes | Regras cobertas |
 | --- | --- | --- |
@@ -75,6 +77,7 @@ A pirâmide é mais larga no meio do que na base, de propósito. O FRD não abre
 | Abandono após 24 horas sem alteração | 7 | 23h59 continua aberto, 24h é abandonado; um `GET` não reinicia a contagem, uma mutação reinicia; `empty` nunca |
 | Última alteração do Cart | 8 | Cada mutação grava o instante do relógio; leituras e recusas não gravam |
 | Alterações concorrentes no mesmo Cart | 3 | Duas remoções simultâneas esvaziam o Cart e retiram o Coupon; duas adições cuja soma passa do Stock ou de 99: uma passa, a outra é recusada (ticket 10, achados R1 e R2 da revisão) |
+| Ids na forma `urn:uuid:` | 4 | Id do Cart, id do Product no caminho, `shopperId` no corpo e id do Order na forma `urn:uuid:` → `400 VALIDATION_ERROR` (ticket 14, achado S4 do relatório de segurança) |
 
 ### `orders.test.ts`: 17 testes
 
@@ -90,12 +93,12 @@ A pirâmide é mais larga no meio do que na base, de propósito. O FRD não abre
 | Arquivo | Testes | Cobre |
 | --- | --- | --- |
 | `domain-errors.test.ts` | 4 | Erro de domínio → status e envelope `{ error: { code, message, details? } }`; código sem status → `500` sem vazar a mensagem |
-| `seed.test.ts` | 13 | O seed gera Carts em cada status e Orders coerentes passando pelo próprio `CartsService` ([relatório de seeds](../seeds-report.md)) |
+| `seed.test.ts` | 15 | O seed gera Carts em cada status e Orders coerentes passando pelo próprio `CartsService` ([relatório de seeds](../seeds-report.md)); o seed inicial só povoa um banco sem Products |
 | `products.test.ts`, `health.test.ts`, `errors.test.ts` | 10 | Catálogo, `/health` e erros genéricos, do scaffolding |
 
 ## E2E: navegador contra a stack
 
-[e2e/tests/cart.spec.ts](../../e2e/tests/cart.spec.ts), Playwright: 17 testes do Carrinho, mais 3 do catálogo e do `/health`. Cada teste usa um contexto de navegador novo (um Shopper novo) e insere os próprios dados. O mapa cenário → teste, como a stack E2E é isolada e as 3 execuções seguidas estão no [relatório E2E](e2e-report-carrinho.md); não se repetem aqui.
+[e2e/tests/cart.spec.ts](../../e2e/tests/cart.spec.ts), Playwright: 17 testes do Carrinho, mais 4 do catálogo, do `/health` e dos cabeçalhos de segurança. Cada teste usa um contexto de navegador novo (um Shopper novo) e insere os próprios dados. O mapa cenário → teste, como a stack E2E é isolada e as 3 execuções seguidas estão no [relatório E2E](e2e-report-carrinho.md); não se repetem aqui.
 
 Em resumo, o E2E cobre:
 
