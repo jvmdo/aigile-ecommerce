@@ -49,7 +49,7 @@ _Avoid_: Locked, pending
 A Cart that has been converted into an Order. Final.
 
 **Abandoned** (Abandonado):
-A Cart with items that the Shopper gave up on, either explicitly or by leaving it unchanged for 24 hours (only looking at it does not count). Final; the Shopper starts a new Cart. An Empty Cart is never Abandoned.
+A Cart with items that the Shopper gave up on, either explicitly or by leaving it unchanged for 24 hours (only looking at it does not count). Final; the Shopper starts a new Cart. An Empty Cart is never Abandoned. When it happens by time, the Shopper is told their Cart expired; that is wording on screen, not a separate status.
 _Avoid_: Expired, cancelled
 
 ### Ordering

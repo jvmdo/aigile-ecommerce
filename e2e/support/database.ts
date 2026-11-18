@@ -28,6 +28,42 @@ export async function setStock(productName: string, stock: number): Promise<void
   }
 }
 
+/** Sets a Product's price behind the frontend's back, as a price change in the store would. */
+export async function setPrice(productName: string, priceCents: number): Promise<void> {
+  const client = new pg.Client({ connectionString: requireDatabaseUrl() });
+  await client.connect();
+  try {
+    await client.query("UPDATE products SET price_cents = $1 WHERE name = $2", [
+      priceCents,
+      productName,
+    ]);
+  } finally {
+    await client.end();
+  }
+}
+
+/**
+ * Moves back the last change of every Cart holding the Product, as if that many hours had
+ * passed without a change; the stack's clock cannot be moved.
+ */
+export async function backdateCartHolding(productName: string, hours: number): Promise<void> {
+  const client = new pg.Client({ connectionString: requireDatabaseUrl() });
+  await client.connect();
+  try {
+    await client.query(
+      `UPDATE carts SET last_changed_at = last_changed_at - make_interval(hours => $2)
+       WHERE id IN (
+         SELECT cart_items.cart_id FROM cart_items
+         JOIN products ON products.id = cart_items.product_id
+         WHERE products.name = $1
+       )`,
+      [productName, hours],
+    );
+  } finally {
+    await client.end();
+  }
+}
+
 /** A Coupon row as the e2e tests insert it; `code` must be in upper case, as the table requires. */
 export type CouponRow = {
   code: string;

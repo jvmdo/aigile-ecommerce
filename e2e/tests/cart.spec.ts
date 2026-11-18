@@ -1,5 +1,11 @@
 import { type Page, expect, test } from "@playwright/test";
-import { insertCoupon, replaceProducts, setStock } from "../support/database.ts";
+import {
+  backdateCartHolding,
+  insertCoupon,
+  replaceProducts,
+  setPrice,
+  setStock,
+} from "../support/database.ts";
 
 // Each test gets a new browser context, so a new Shopper with no Cart.
 test.beforeEach(async () => {
@@ -423,4 +429,119 @@ test("abandoning the Cart forgets it, and the next addition starts a new Cart", 
     quantity: "1",
     lineTotal: "R$ 50,00",
   });
+});
+
+test("a Cart left unchanged for 24 hours shows as expired, and the next addition starts a new Cart", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addFromCatalog(page, "Caneca Esmaltada", "2");
+  await expect(productCard(page, "Caneca Esmaltada").getByRole("status")).toBeVisible();
+  await backdateCartHolding("Caneca Esmaltada", 24);
+
+  await openCart(page);
+
+  await expect(page.getByText("Seu carrinho expirou.")).toBeVisible();
+  await page.getByRole("link", { name: "Ver o catálogo" }).click();
+  await addFromCatalog(page, "Vaso de Barro", "1");
+  await expect(productCard(page, "Vaso de Barro").getByRole("status")).toHaveText(
+    "Adicionado ao carrinho.",
+  );
+  await openCart(page);
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Com itens");
+  await expect(page.locator(".cart-item")).toHaveCount(1);
+  await expectCartItem(page, {
+    name: "Vaso de Barro",
+    unitPrice: "R$ 50,00",
+    quantity: "1",
+    lineTotal: "R$ 50,00",
+  });
+});
+
+test("a Shopper cannot use a Coupon again after an Order, while another Shopper still can", async ({
+  page,
+  browser,
+}) => {
+  await insertCoupon({
+    code: "DEZ",
+    type: "percentage",
+    value: 10,
+    expiresAt: new Date("2099-01-01T00:00:00Z"),
+  });
+  await page.goto("/");
+  await addFromCatalog(page, "Caneca Esmaltada", "1");
+  await expect(productCard(page, "Caneca Esmaltada").getByRole("status")).toBeVisible();
+  await openCart(page);
+  await page.getByLabel("Código do cupom").fill("DEZ");
+  await page.getByRole("button", { name: "Aplicar cupom" }).click();
+  await expect(page.locator(".cart-discount")).toHaveText("Desconto: R$ 3,99");
+  await page.getByRole("button", { name: "Finalizar compra" }).click();
+  await page.getByRole("button", { name: "Confirmar pedido" }).click();
+  await expect(page.locator(".order-coupon")).toHaveText("Cupom: DEZ (10% de desconto)");
+
+  await page.getByRole("link", { name: "Continuar comprando" }).click();
+  await addFromCatalog(page, "Vaso de Barro", "1");
+  await expect(productCard(page, "Vaso de Barro").getByRole("status")).toBeVisible();
+  await openCart(page);
+  await page.getByLabel("Código do cupom").fill("DEZ");
+  await page.getByRole("button", { name: "Aplicar cupom" }).click();
+
+  await expect(page.getByRole("alert")).toHaveText("Você já usou este cupom em outro pedido.");
+  await expect(page.locator(".cart-total")).toHaveText("Total: R$ 50,00");
+
+  // Another browser is another Shopper, who has never used DEZ.
+  const otherContext = await browser.newContext({ baseURL: test.info().project.use.baseURL });
+  try {
+    const otherPage = await otherContext.newPage();
+    await otherPage.goto("/");
+    await addFromCatalog(otherPage, "Vaso de Barro", "1");
+    await expect(productCard(otherPage, "Vaso de Barro").getByRole("status")).toBeVisible();
+    await openCart(otherPage);
+    await otherPage.getByLabel("Código do cupom").fill("DEZ");
+    await otherPage.getByRole("button", { name: "Aplicar cupom" }).click();
+
+    await expect(otherPage.locator(".cart-coupon-applied")).toContainText(
+      "Cupom aplicado: DEZ (10% de desconto)",
+    );
+    await expect(otherPage.locator(".cart-discount")).toHaveText("Desconto: R$ 5,00");
+    await expect(otherPage.locator(".cart-total")).toHaveText("Total: R$ 45,00");
+  } finally {
+    await otherContext.close();
+  }
+});
+
+test("a browser with its storage cleared is a new Shopper with an empty Cart", async ({ page }) => {
+  await page.goto("/");
+  await addFromCatalog(page, "Caneca Esmaltada", "2");
+  await expect(productCard(page, "Caneca Esmaltada").getByRole("status")).toBeVisible();
+  await openCart(page);
+  await expect(page.locator(".cart-status")).toHaveText("Estado: Com itens");
+
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+
+  await expect(page.getByText("Seu carrinho está vazio.")).toBeVisible();
+});
+
+test("a Product's new price shows in the catalog but not on the item already in the Cart", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await addFromCatalog(page, "Caneca Esmaltada", "2");
+  await expect(productCard(page, "Caneca Esmaltada").getByRole("status")).toBeVisible();
+
+  await setPrice("Caneca Esmaltada", 4590);
+
+  await openCart(page);
+  await expectCartItem(page, {
+    name: "Caneca Esmaltada",
+    unitPrice: "R$ 39,90",
+    quantity: "2",
+    lineTotal: "R$ 79,80",
+  });
+  await expect(page.locator(".cart-subtotal")).toHaveText("Subtotal: R$ 79,80");
+  await page.getByRole("link", { name: "Catálogo" }).click();
+  await expect(productCard(page, "Caneca Esmaltada").locator(".product-price")).toHaveText(
+    "R$ 45,90",
+  );
 });

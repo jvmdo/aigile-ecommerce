@@ -14,6 +14,7 @@ Quebra do [FRD do Carrinho](frd-carrinho.md) em tickets verticais (tracer bullet
 | 06 | [Confirmar o Order](issues/06-confirmar-order.md) | 05 | Transação de confirmação (ADR 0009), Order, página de confirmação |
 | 07 | [Coupon de uso único por Shopper](issues/07-coupon-uso-unico-por-shopper.md) | 06 | `COUPON_ALREADY_USED` ao aplicar e ao confirmar, índice único parcial |
 | 08 | [Abandono do Cart](issues/08-abandono.md) | 05 | Abandono explícito e por 24 h sob demanda, "Seu carrinho expirou" |
+| 09 | [Lacunas do E2E do Carrinho e relatório E2E](issues/09-lacunas-e2e.md) | — | Quatro testes E2E novos (Cart expirado, uso único do Coupon, navegador limpo, preço fixo) e `e2e-report-carrinho.md` |
 
 ## Grafo de dependências
 
@@ -26,6 +27,8 @@ graph LR
     T05 --> T06[06 Confirmar Order]
     T06 --> T07[07 Uso único]
     T05 --> T08[08 Abandono]
+    T07 -.-> T09[09 Lacunas E2E]
+    T08 -.-> T09
 ```
 
 ## Ordem de execução
@@ -39,6 +42,7 @@ Trabalha-se a **fronteira**: qualquer ticket cujos bloqueadores estejam concluí
 5. 05
 6. 06 e 08 (independentes entre si; qualquer ordem)
 7. 07 (depois de 06)
+8. 09 (acrescentado depois de 01–08 concluídos; por isso não tem bloqueador aberto)
 
 Cada ticket é implementado numa sessão limpa (`/clear` entre tickets), por TDD nas seams acordadas no FRD, terminando com um commit no `main` que fecha o ticket.
 

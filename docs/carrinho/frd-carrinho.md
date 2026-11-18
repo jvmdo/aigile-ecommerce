@@ -281,9 +281,13 @@ Todas as rotas ficam sob `/api`. Toda rota de Cart devolve o Cart completo; `con
    - recarregar a página mantém o Cart;
    - abandono explícito;
    - erro de Stock exibido ao confirmar quando o Stock foi reduzido por fora;
-   - erro de Coupon inválido exibido.
+   - erro de Coupon inválido exibido;
+   - Cart expirado: depois de recuar no banco a última alteração do Cart em 24 horas, o Shopper vê "Seu carrinho expirou." e a próxima adição cria um Cart novo;
+   - Coupon de uso único por Shopper: depois de um Order com o Coupon, reaplicá-lo mostra a mensagem de `COUPON_ALREADY_USED`, e outro Shopper (outro contexto de navegador) ainda consegue aplicá-lo;
+   - navegador limpo é um Shopper novo: limpar o `localStorage` e recarregar mostra o Cart vazio;
+   - preço unitário fixo: depois de mudar no banco o preço do Product, o Cart mantém o preço antigo e o catálogo mostra o novo.
 
-   O abandono por 24 horas **não** é testado aqui, porque o relógio da stack não é controlável; a seam 1 cobre.
+   O limite das 24 horas (23h59 contra 24h, `GET` sem reiniciar a contagem) **não** é testado aqui, porque o relógio da stack não é controlável; a seam 1 cobre. O E2E cobre só a tela do Cart expirado, recuando a última alteração do Cart no banco.
 3. **Domain do frontend (unidade)**: funções puras com Vitest. Cobre:
    - validação de quantidade (0, 1, 99, 100, fracionário, acima do Stock exibido);
    - ações permitidas por status;
