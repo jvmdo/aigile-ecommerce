@@ -1,4 +1,4 @@
-import type { AppliedCoupon, OrderStatus } from "@aigile/shared";
+import type { AppliedCoupon, OrderItem, OrderStatus } from "@aigile/shared";
 import { and, asc, eq } from "drizzle-orm";
 import type { Queryable } from "../db/connection.ts";
 import { violatesUnique } from "../db/errors.ts";
@@ -16,18 +16,14 @@ export type OrderRecord = {
   createdAt: Date;
 };
 
-export type OrderItemRecord = {
-  productId: string;
-  name: string;
-  unitPriceCents: number;
-  quantity: number;
-};
+/** An Order Item as stored: the API shape without the line total the Service computes. */
+export type OrderItemRecord = Pick<OrderItem, "productId" | "name" | "unitPriceCents" | "quantity">;
 
 /** What confirming a Cart writes: the Order, created in status `created`, and its items in order. */
 export type NewOrder = {
   shopperId: string;
   cartId: string;
-  items: { productId: string; quantity: number; unitPriceCents: number }[];
+  items: Pick<OrderItem, "productId" | "quantity" | "unitPriceCents">[];
   coupon: AppliedCoupon | null;
   subtotalCents: number;
   discountCents: number;

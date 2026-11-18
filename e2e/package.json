@@ -8,6 +8,7 @@
     "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@aigile/shared": "0.0.0",
     "@playwright/test": "1.52.0",
     "@types/pg": "^8.23.1",
     "pg": "^8.23.1"

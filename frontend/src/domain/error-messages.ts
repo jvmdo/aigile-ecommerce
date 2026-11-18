@@ -1,4 +1,5 @@
 import {
+  type CartItem,
   type DomainErrorCode,
   type InsufficientStockDetail,
   MAX_ITEM_QUANTITY,
@@ -40,7 +41,7 @@ export function errorMessage(code: string | undefined): string {
 export function cartErrorMessage(
   code: string | undefined,
   details: unknown,
-  items: readonly { productId: string; name: string }[],
+  items: readonly Pick<CartItem, "productId" | "name">[],
 ): string {
   if (code !== "INSUFFICIENT_STOCK" || !Array.isArray(details)) {
     return errorMessage(code);

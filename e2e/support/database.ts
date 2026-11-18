@@ -1,3 +1,4 @@
+import type { CouponType } from "@aigile/shared";
 import pg from "pg";
 
 /** A Product row as the e2e tests insert it; the database generates the id. */
@@ -67,7 +68,7 @@ export async function backdateCartHolding(productName: string, hours: number): P
 /** A Coupon row as the e2e tests insert it; `code` must be in upper case, as the table requires. */
 export type CouponRow = {
   code: string;
-  type: "percentage" | "fixed";
+  type: CouponType;
   value: number;
   expiresAt: Date;
 };

@@ -6,9 +6,13 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `CartItemRecord` ([carts.repository.ts](../../../backend/src/carts/carts.repository.ts)) e `OrderItemRecord` ([orders.repository.ts](../../../backend/src/orders/orders.repository.ts)) são `Pick`s de `CartItem` e `OrderItem` do `shared`.
-- [ ] `NewOrder.items` usa um `Pick` de `OrderItem` em vez do tipo inline.
-- [ ] O tipo inline `{ productId; name }` de [error-messages.ts](../../../frontend/src/domain/error-messages.ts) e o literal `"percentage" | "fixed"` de [database.ts](../../../e2e/support/database.ts) passam a usar os tipos do `shared` (`Pick` de `CartItem`, `CouponType`).
-- [ ] `make check` e `make test` verdes.
+- [x] `CartItemRecord` ([carts.repository.ts](../../../backend/src/carts/carts.repository.ts)) e `OrderItemRecord` ([orders.repository.ts](../../../backend/src/orders/orders.repository.ts)) são `Pick`s de `CartItem` e `OrderItem` do `shared`.
+- [x] `NewOrder.items` usa um `Pick` de `OrderItem` em vez do tipo inline.
+- [x] O tipo inline `{ productId; name }` de [error-messages.ts](../../../frontend/src/domain/error-messages.ts) e o literal `"percentage" | "fixed"` de [database.ts](../../../e2e/support/database.ts) passam a usar os tipos do `shared` (`Pick` de `CartItem`, `CouponType`).
+- [x] `make check` e `make test` verdes.
+
+## Comments
+
+- O `e2e` passou a declarar `@aigile/shared` como devDependency para importar `CouponType`. O import é só de tipo e é apagado ao rodar o Playwright, então a imagem do E2E não precisa do código do `shared`.

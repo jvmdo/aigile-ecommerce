@@ -1,4 +1,4 @@
-import type { CartStatus, CouponType } from "@aigile/shared";
+import type { CartItem, CartStatus, CouponType } from "@aigile/shared";
 import { and, asc, eq, sql } from "drizzle-orm";
 import type { Queryable } from "../db/connection.ts";
 import { cartItems, carts, coupons, products } from "../db/schema.ts";
@@ -23,12 +23,8 @@ export type CouponRecord = {
   expiresAt: Date;
 };
 
-export type CartItemRecord = {
-  productId: string;
-  name: string;
-  unitPriceCents: number;
-  quantity: number;
-};
+/** A Cart Item as stored: the API shape without the line total the Service computes. */
+export type CartItemRecord = Pick<CartItem, "productId" | "name" | "unitPriceCents" | "quantity">;
 
 export type CartsRepository = {
   /** Inserts an empty Cart and returns its id. */
