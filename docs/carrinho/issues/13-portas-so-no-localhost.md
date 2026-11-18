@@ -6,9 +6,13 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `db` e `api` publicam suas portas em `127.0.0.1` no `docker-compose.yml`; `frontend` não muda.
-- [ ] O README diz que banco e API só aceitam conexões do próprio host.
-- [ ] `docker compose up` sobe a stack; `http://localhost:8800/health` e `http://localhost:8080` respondem `200`; `make test` verde.
-- [ ] Criar um papel sem superusuário para a API fica fora deste ticket, registrado como risco aceito no relatório de segurança.
+- [x] `db` e `api` publicam suas portas em `127.0.0.1` no `docker-compose.yml`; `frontend` não muda.
+- [x] O README diz que banco e API só aceitam conexões do próprio host.
+- [x] `docker compose up` sobe a stack; `http://localhost:8800/health` e `http://localhost:8080` respondem `200`; `make test` verde.
+- [x] Criar um papel sem superusuário para a API fica fora deste ticket, registrado como risco aceito no relatório de segurança.
+
+## Comments
+
+- Verificado: `docker ps` mostra `127.0.0.1:5432` e `127.0.0.1:8800`; `localhost:8800/health` e `localhost:8080` respondem `200`; a API pelo IP de rede do host recusa a conexão; `make test` verde (31 + 130 + 20).

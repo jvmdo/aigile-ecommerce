@@ -9,7 +9,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecommerce}
       POSTGRES_DB: ${POSTGRES_DB:-ecommerce}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      # Only the host itself reaches the database (security report, S6).
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
       # Creates the ecommerce_test database the first time the volume is initialised.
@@ -44,7 +45,8 @@ services:
       PORT: 8800
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
-      - "${API_PORT:-8800}:8800"
+      # Only the host itself reaches the API directly; the network goes through nginx (S7).
+      - "127.0.0.1:${API_PORT:-8800}:8800"
     depends_on:
       db:
         condition: service_healthy

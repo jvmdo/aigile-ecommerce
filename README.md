@@ -32,6 +32,8 @@ Não é preciso criar `.env`: todas as variáveis têm valor padrão (veja [`.en
 | API | <http://localhost:8800> |
 | PostgreSQL | `localhost:5432` (usuário e senha `ecommerce`) |
 
+A API e o PostgreSQL só aceitam conexões do próprio host (publicados em `127.0.0.1`); outras máquinas da rede chegam só ao frontend, que repassa `/api/` e `/health` à API.
+
 ### Verificação
 
 - <http://localhost:8080> mostra o catálogo: nome, descrição, preço em reais e Stock de cada Product, com o selo "Esgotado" quando o Stock é zero. Sem Products, mostra uma mensagem de catálogo vazio; se a API não responde, uma mensagem de erro.
