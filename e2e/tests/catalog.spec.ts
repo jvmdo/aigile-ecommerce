@@ -44,3 +44,16 @@ test('a Product with zero Stock shows the "Esgotado" badge', async ({ page }) =>
   await expect(mug).toBeVisible();
   await expect(mug.getByText("Esgotado", { exact: true })).toHaveCount(0);
 });
+
+test("the page and the API it proxies come with the security headers", async ({ request }) => {
+  for (const path of ["/", "/api/products"]) {
+    const response = await request.get(path);
+
+    expect(response.ok(), path).toBe(true);
+    const headers = response.headers();
+    expect(headers["content-security-policy"], path).toContain("default-src 'self'");
+    expect(headers["content-security-policy"], path).toContain("frame-ancestors 'none'");
+    expect(headers["x-content-type-options"], path).toBe("nosniff");
+    expect(headers.server, path).toBe("nginx");
+  }
+});

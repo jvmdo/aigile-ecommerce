@@ -24,5 +24,6 @@ RUN npm run build
 # Runtime: nginx serves the build and proxies the API (ADR 0003).
 FROM nginx:1.27-alpine AS runtime
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY frontend/nginx-security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /app/frontend/dist /usr/share/nginx/html
 EXPOSE 8080
